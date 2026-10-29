@@ -1,0 +1,40 @@
+{
+  "name": "ben-claude-multi",
+  "version": "1.0.0",
+  "description": "Manage separate Claude Code and Claude Desktop configuration profiles on macOS.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lyhuuloi/ben-claude-multi.git"
+  },
+  "homepage": "https://github.com/lyhuuloi/ben-claude-multi#readme",
+  "bugs": "https://github.com/lyhuuloi/ben-claude-multi/issues",
+  "author": "Loi Ly",
+  "keywords": ["claude", "claude-code", "macos", "profiles", "cli"],
+  "os": ["darwin"],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2"
+  },
+  "bin": {
+    "ben-claude-multi": "dist/src/main.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "npm-shrinkwrap.json"
+  ],
+  "scripts": {
+    "build": "tsc && node dist/scripts/prepare-dist.js",
+    "test": "npm run build && node dist/scripts/run-tests.js",
+    "test:native": "npm run build && node dist/scripts/run-tests.js native",
+    "install-local": "npm run build && node dist/scripts/install-local.js"
+  },
+  "license": "MIT"
+}
