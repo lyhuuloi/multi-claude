@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `npm publish` now builds and runs the full test suite first through `prepublishOnly`, so a stale
+  or missing local `dist/` can no longer be published.
+
 ## 1.0.0
 
 Initial release of ben-claude-multi for macOS and Node.js 20 or newer.

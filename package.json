@@ -34,7 +34,8 @@
     "build": "tsc && node dist/scripts/prepare-dist.js",
     "test": "npm run build && node dist/scripts/run-tests.js",
     "test:native": "npm run build && node dist/scripts/run-tests.js native",
-    "install-local": "npm run build && node dist/scripts/install-local.js"
+    "install-local": "npm run build && node dist/scripts/install-local.js",
+    "prepublishOnly": "npm test"
   },
   "license": "MIT"
 }

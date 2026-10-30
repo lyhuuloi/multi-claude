@@ -49,6 +49,9 @@ compiled runtime modules, that build record, the package manifest, the reviewed
 build scripts are excluded. The shrinkwrap contains development-only dependencies;
 production installation needs no dependency resolution.
 
+`npm publish` runs `npm test` first through the `prepublishOnly` script, so a publish always packs a
+fresh, tested build and never a stale local `dist/`.
+
 Before installing, run `npm test` and inspect `npm pack --dry-run`. A disposable
 production-install check can be run entirely offline after building:
 
