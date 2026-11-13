@@ -60,18 +60,59 @@ multi-claude add work --target terminal
 
 Open a new terminal, run `claude-work`, then `/login` with the second account.
 
-### A second Claude Desktop account (with its own Code)
+### A second Claude Desktop window
+
+There are three kinds of profile. Pick by what you want to end up with:
+
+| You want | Use | You get |
+| --- | --- | --- |
+| A second account in the terminal only | `--target terminal` | the command `claude-work` |
+| A second Claude Desktop window | `--target paired` | the app `Claude work` **and** the command `claude-work` |
+| Desktop only | `--target desktop` | the app `Claude work`; its Code tab shares `~/.claude` with your main Claude |
+
+For a Desktop window, use `paired`. Step by step, for a profile called `work`:
+
+**1. Run the command** in Terminal.app:
 
 ```sh
 multi-claude add work --target paired
 ```
 
-The tool asks a few questions; press Return to accept each default. Then:
+**2. Answer the questions.** Press Return on every one to accept the default shown in `[brackets]`.
+The first group sets up the terminal command, the second group sets up the Desktop app:
 
-1. Open `Claude work` from `~/Applications/Claude Profiles` (your home folder's Applications,
-   not the system one) and sign in.
-2. Keep that launcher in the Dock. Always start the profile from the launcher,
-   never from the running Claude tile or Spotlight.
+```text
+Code directory [~/.local/share/multi-claude/work/code]         Return
+Shell: zsh, bash or fish [zsh]                                 Return
+Shell rc file: [~/.zshrc]                                      Return
+Terminal command [claude-work]                                 Return
+Credential policy: subscription or inherit [subscription]      Return
+Import allowlisted baseline Code setup? [y/N]                  Return (y copies your skills, plugins and hooks)
+Enable a private GitHub CLI directory? [y/N]                   Return
+
+Claude source application: [/Applications/Claude.app]          Return
+Desktop data directory: [~/.local/share/multi-claude/work/desktop]   Return
+Dock launcher: [~/Applications/Claude Profiles/Claude work.app]      Return
+Use the Claude icon? y/n [y]                                   Return
+Tint: none, amber, copper, mint, sky, violet or rose [none]    Return (a color helps tell the windows apart)
+Also add a shortcut in /Applications? y/n [n]                  y if you want it in Applications
+Apply this profile plan? [y/N]                                 y
+```
+
+The tool then copies Claude.app (about 600 MB, a few seconds) and builds the launcher.
+
+**3. Open the new app.** In Finder press Shift-Command-G and go to `~/Applications/Claude Profiles`
+(or look in Applications if you said `y` to the shortcut). Double-click `Claude work`.
+A second Claude Desktop window opens next to your main one.
+
+**4. Sign in** with the second account in that window. Typing the email code works best;
+a sign-in link from the browser can land in the other Claude window.
+
+**5. Keep it in the Dock.** Drag `Claude work` from Finder to the Dock. Always start the profile
+from this launcher. The tile that appears while it runs, Spotlight and "Keep in Dock" on that
+running tile all bypass the profile.
+
+To check it worked: `multi-claude status work`.
 
 ### Optional: show the launcher in /Applications
 
