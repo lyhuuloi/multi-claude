@@ -7,6 +7,7 @@ import { Problem } from '../src/outcomes.js';
 import { protectedPath } from '../src/location-guard.js';
 import { PrivateIO, treeManifest, cleanSealedTree } from '../src/private-io.js';
 import { launchdOverrideNames } from '../src/desktop-services.js';
+import { launcherSource } from '../src/dock-bundles.js';
 const testRoot = requireIsolation();
 const kind = (expected: string) => (error: unknown) => error instanceof Problem && error.kind === expected;
 function bundle() {
@@ -51,4 +52,10 @@ test('D005 launchd overrides are the names with a value, not every name launchct
   assert.equal(asked.length, 10);
   assert.deepEqual(await launchdOverrideNames(async () => ({ code: 0, stdout: '' })), []);
   assert.deepEqual(await launchdOverrideNames(async () => ({ code: 113, stdout: 'ignored' })), []);
+});
+test('D006 every system tool the launcher script calls exists on this host', () => {
+  const source = launcherSource('/node/path', '/cli/main.js', '11111111-1111-4111-8111-111111111111', '/catalog.json');
+  const tools = [...source.matchAll(/(?<![\w'\/])\/(?:usr\/)?bin\/[a-z]+/g)].map(match => match[0]);
+  assert.ok(tools.length >= 2);
+  assert.deepEqual(tools.filter(tool => !existsSync(tool)), []);
 });

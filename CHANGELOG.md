@@ -11,6 +11,9 @@
   `launchctl getenv` exits 0 for a name that is not set; only names with a value count.
 - The launcher-managed update policy is written as `configLibrary/<id>.json`, the name Claude Desktop
   reads. A policy written by 1.0.0 is reported as changed; switch it with `desktop-updates`.
+- The Dock launcher no longer stops with "The profile engine is missing": its engine check called
+  `/usr/bin/test`, which macOS does not ship; it now calls `/bin/test`. Recompile existing launchers
+  with `repair <label>`.
 
 ## 1.0.0
 

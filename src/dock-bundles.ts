@@ -38,7 +38,7 @@ export function launcherSource(runtime: string, cli: string, profileId: string, 
   if (![runtime, cli, catalog].every(isAbsolute)) {
     throw new Problem('launcher-path', 'Launcher engine paths must be absolute.');
   }
-  const check = `/usr/bin/test -x ${shellQuote(runtime)} && /usr/bin/test -f ${shellQuote(cli)}`;
+  const check = `/bin/test -x ${shellQuote(runtime)} && /bin/test -f ${shellQuote(cli)}`;
   const command = ['/usr/bin/env -u NODE_OPTIONS -u NODE_PATH', runtime, cli, '_dock-entry', profileId, catalog]
   .map((value, index) => index ? shellQuote(value) : value).join(' ');
   return [
