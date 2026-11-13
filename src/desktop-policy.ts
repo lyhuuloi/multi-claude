@@ -35,7 +35,7 @@ export function policyView(profile: Profile, io: PrivateIO): PolicyView {
     if (metadata) {
       const meta = jsonDocument(metadata.bytes);
       if (meta && typeof meta === 'object' && !Array.isArray(meta) && 'appliedId' in meta && uuid(meta.appliedId)) {
-        const entry = io.read(join(location, 'configLibrary', meta.appliedId));
+        const entry = io.read(join(location, 'configLibrary', meta.appliedId + '.json'));
         if (entry) {
           const value = jsonDocument(entry.bytes);
           if (value && typeof value === 'object' && 'disableAutoUpdates' in value) {
@@ -61,7 +61,7 @@ export function policyView(profile: Profile, io: PrivateIO): PolicyView {
       || !receipt.members || typeof receipt.members !== 'object' || Array.isArray(receipt.members)) {
       return base;
     }
-    const names = ['.bcm-root.json', 'configLibrary/_meta.json', 'configLibrary/' + receipt.entry].sort();
+    const names = ['.bcm-root.json', 'configLibrary/_meta.json', 'configLibrary/' + receipt.entry + '.json'].sort();
     if (JSON.stringify(Object.keys(receipt.members).sort()) !== JSON.stringify(names)) {
       return base;
     }
@@ -92,7 +92,8 @@ export function createPolicy(profile: Profile, catalog: Catalog, transaction: Ch
     ['configLibrary/_meta.json', JSON.stringify({
       appliedId: entry, entries: [{ id: entry, name: 'Managed updates' }],
     })],
-    ['configLibrary/' + entry, JSON.stringify({ disableAutoUpdates: true })],
+    // Claude Desktop reads the applied entry as configLibrary/<id>.json.
+    ['configLibrary/' + entry + '.json', JSON.stringify({ disableAutoUpdates: true })],
   ]);
   for (const [name, bytes] of members) {
     io.write(join(stage, name), bytes, null);

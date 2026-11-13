@@ -106,6 +106,19 @@ function run(a) {
 }
 const launchServices = '/System/Library/Frameworks/CoreServices.framework/Frameworks/'
 + 'LaunchServices.framework/Support/lsregister';
+export async function launchdOverrideNames(
+  read: (name: string) => Promise<{ code: number; stdout: string }>,
+): Promise<string[]> {
+  const names: string[] = [];
+  for (const name of [...authenticationOverrides, ...githubOverrides, 'CLAUDE_CONFIG_DIR', 'GH_CONFIG_DIR']) {
+    const result = await read(name);
+    // launchctl exits 0 with empty output for a name that is not set.
+    if (result.code === 0 && result.stdout.trim() !== '') {
+      names.push(name);
+    }
+  }
+  return names;
+}
 export function productionDesktopServices(): DesktopServices {
   const artifacts = productionDesktopArtifacts();
   return {
@@ -170,16 +183,7 @@ function run(a) {
         throw new Problem('dock-restart', 'The requested Dock restart was unavailable.', Exit.unavailable);
       }
     },
-    async launchdOverrides() {
-      const names: string[] = [];
-      for (const name of [...authenticationOverrides, ...githubOverrides, 'CLAUDE_CONFIG_DIR', 'GH_CONFIG_DIR']) {
-        const result = await execute('/bin/launchctl', ['getenv', name]);
-        if (result.code === 0) {
-          names.push(name);
-        }
-      }
-      return names;
-    },
+    launchdOverrides: () => launchdOverrideNames(name => execute('/bin/launchctl', ['getenv', name])),
     async open(args, env) {
       const result = await execute(systemTools.open, args, { env, timeout: 20000 });
       if (result.code !== 0) {

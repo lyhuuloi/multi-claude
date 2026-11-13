@@ -120,7 +120,7 @@ test('T132 S64 policy creation uses an owned absent root with digests and a UUID
   const view = policyView(f.profile(), f.io);
   assert.equal(view.kind, 'owned');
   assert.ok(view.receipt?.entry);
-  const entry = JSON.parse(contents(join(view.location, 'configLibrary', view.receipt!.entry)));
+  const entry = JSON.parse(contents(join(view.location, 'configLibrary', view.receipt!.entry + '.json')));
   assert.equal(entry.disableAutoUpdates, true);
   const metadata = JSON.parse(contents(join(view.location, 'configLibrary/_meta.json')));
   assert.equal(metadata.appliedId, view.receipt!.entry);
@@ -134,7 +134,7 @@ for (const member of ['configLibrary/_meta.json', 'entry', '.bcm-policy.json']) 
     const f = lifecycleFixture();
     assert.equal((await f.addDesktop()).code, 0);
     const view = policyView(f.profile(), f.io);
-    const path = join(view.location, member === 'entry' ? 'configLibrary/' + view.receipt!.entry : member);
+    const path = join(view.location, member === 'entry' ? 'configLibrary/' + view.receipt!.entry + '.json' : member);
     f.put(path, '{}');
     const snapshots = readdirSync(join(view.location, 'configLibrary')).map(name =>
       [name, contents(join(view.location, 'configLibrary', name))]);
@@ -290,7 +290,7 @@ test('T143 S24 approved Desktop deletion removes owned policy but preserves unre
   assert.equal(existsSync(profile.desktop!.location), false);
   assert.equal(contents(join(view.location, 'third-party-data')), 'keep credentials');
   assert.equal(existsSync(join(view.location, '.bcm-policy.json')), false);
-  assert.equal(existsSync(join(view.location, 'configLibrary', view.receipt!.entry)), false);
+  assert.equal(existsSync(join(view.location, 'configLibrary', view.receipt!.entry + '.json')), false);
   assert.ok(catalog(f).releasedLocations.some(record => record.location === view.location && record.reason === 'kept'));
 });
 test('T028 S24 removal rechecks Desktop identity immediately before staging deletion', async () => {

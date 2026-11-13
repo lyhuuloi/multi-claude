@@ -11,6 +11,13 @@ export function protectedPath(path: string): string {
   }
   return normalize(path);
 }
+function descendantPath(path: string, root: string): string {
+  if (path !== root && (!path.startsWith(root + '/') || path.includes('\0')
+    || path.slice(root.length + 1).split('/').some(part => part === '' || part === '.' || part === '..'))) {
+    throw new Problem('path-syntax', 'A tree entry must stay inside its protected root.');
+  }
+  return path;
+}
 export function canonicalLocation(path: string): string {
   let cursor = protectedPath(path);
   const tail: string[] = [];
@@ -68,8 +75,10 @@ export class LocationGuard {
   private readonly inspectedAcls = new Map<string, string>();
   constructor(readonly uid = currentUid(), private readonly acl = parentAclAllowsReplacement) {
   }
-  chain(path: string): DirectoryStamp[] {
-    const normalized = protectedPath(path);
+  // `within` names an already selected root. Entries below it are names the tool did not choose, such as
+  // "Claude Helper (GPU).app" inside a copied application, so only their traversal syntax is refused.
+  chain(path: string, within?: string): DirectoryStamp[] {
+    const normalized = within === undefined ? protectedPath(path) : descendantPath(path, protectedPath(within));
     let cursor = parse(normalized).root;
     const stamps: DirectoryStamp[] = [];
     const components = normalized.slice(cursor.length).split('/').filter(Boolean);

@@ -130,8 +130,8 @@ export class PrivateIO {
       closeSync(fd);
     }
   }
-  contentDigest(path: string): string {
-    this.guard.chain(dirname(path));
+  contentDigest(path: string, root?: string): string {
+    this.guard.chain(dirname(path), root);
     const before = lstatSync(path, { bigint: true });
     regular(before, this.guard.uid);
     const fd = openSync(path, F.O_RDONLY | F.O_NOFOLLOW | F.O_NONBLOCK);
@@ -358,7 +358,7 @@ export function treeManifest(root: string, io: PrivateIO): TreeEntry[] {
       size: String(s.size),
       modified: String(s.mtimeNs),
       changed: String(s.ctimeNs),
-      digest: kind === 'file' ? io.contentDigest(path) : kind === 'link' ? digest(readlinkSync(path)) : ''
+      digest: kind === 'file' ? io.contentDigest(path, root) : kind === 'link' ? digest(readlinkSync(path)) : ''
     });
     if (kind === 'directory') {
       for (const child of readdirSync(path).sort()) {
@@ -412,7 +412,7 @@ export function cleanSealedTree(root: string, manifest: TreeEntry[], io: Private
         'The staging root was substituted.');
     }
     const path = entry.name ? join(root, entry.name) : root;
-    io.guard.chain(dirname(path));
+    io.guard.chain(dirname(path), entry.name ? root : undefined);
     const s = lstatSync(path, { bigint: true });
     if (String(s.dev) !== entry.device || String(s.ino) !== entry.inode || String(s.uid) !== entry.uid ||
       String(s.mode) !== entry.mode) {
@@ -427,7 +427,7 @@ export function cleanSealedTree(root: string, manifest: TreeEntry[], io: Private
     } else {
       const currentDigest = entry.kind === 'link' && s.isSymbolicLink() ? digest(readlinkSync(path)) : entry.kind
       === 'file'
-      && s.isFile() ? io.contentDigest(path) : null;
+      && s.isFile() ? io.contentDigest(path, root) : null;
       if (currentDigest !== entry.digest || String(s.size) !== entry.size || String(s.mtimeNs) !== entry.modified
         || String(s.ctimeNs) !== entry.changed) {
         throw new Problem('tree-conflict',

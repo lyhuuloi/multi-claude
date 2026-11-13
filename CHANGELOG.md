@@ -4,6 +4,13 @@
 
 - `npm publish` now builds and runs the full test suite first through `prepublishOnly`, so a stale
   or missing local `dist/` can no longer be published.
+- Desktop and paired profiles can be created again: application copies whose helper bundles carry
+  parentheses in their names (`Claude Helper (GPU).app`) are inventoried and cleaned up. Selected
+  locations still refuse those characters.
+- `open-profile` and the Dock launcher no longer refuse every launch on macOS versions where
+  `launchctl getenv` exits 0 for a name that is not set; only names with a value count.
+- The launcher-managed update policy is written as `configLibrary/<id>.json`, the name Claude Desktop
+  reads. A policy written by 1.0.0 is reported as changed; switch it with `desktop-updates`.
 
 ## 1.0.0
 
