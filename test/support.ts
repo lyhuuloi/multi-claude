@@ -17,8 +17,8 @@ export function profileFixture() {
   const home = join(root, 'home');
   mkdirSync(home, { mode: 0o700 });
   const io = new PrivateIO();
-  const control = join(home, '.config/ben-claude-multi');
-  const data = join(home, '.local/share/ben-claude-multi');
+  const control = join(home, '.config/multi-claude');
+  const data = join(home, '.local/share/multi-claude');
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     HOME: home,

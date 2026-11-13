@@ -1,11 +1,11 @@
 {
-  "name": "ben-claude-multi",
+  "name": "multi-claude",
   "version": "1.0.0",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
-      "name": "ben-claude-multi",
+      "name": "multi-claude",
       "version": "1.0.0",
       "devDependencies": {
         "@types/node": "26.6.6",
@@ -15,7 +15,7 @@
         "node": ">=20"
       },
       "bin": {
-        "ben-claude-multi": "dist/src/main.js"
+        "multi-claude": "dist/src/main.js"
       },
       "license": "MIT"
     },

@@ -683,7 +683,7 @@ test('T124 T141 S24 S58 Code rename preserves UUID and files, migrates only elig
     const own = installProfile(fixture);
     file(fixture, join(own.code!.location, 'user-data'), 'keep this');
     file(fixture, join(own.code!.location, 'settings.json'), JSON.stringify({
-      statusLine: { command: 'cat $HOME/.local/share/ben-claude-multi/studio/code/CLAUDE.md' },
+      statusLine: { command: 'cat $HOME/.local/share/multi-claude/studio/code/CLAUDE.md' },
       claudeMdExcludes: [own.code!.location],
       unrelated: own.code!.location,
     }));

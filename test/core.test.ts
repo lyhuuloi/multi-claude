@@ -59,7 +59,7 @@ function fixture() {
     XDG_CONFIG_HOME: config,
     XDG_DATA_HOME: data
   };
-  return { root, home, io, control: join(config, 'ben-claude-multi'), env };
+  return { root, home, io, control: join(config, 'multi-claude'), env };
 }
 function sample(f: ReturnType<typeof fixture>, _catalog: Catalog): Profile {
   const id = randomUUID(),

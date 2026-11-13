@@ -353,7 +353,7 @@ test('T084 T086 T087 S07 launcher data is independently quoted and routes only a
   assert.equal(source.includes(' &\n'), false);
   assert.equal(source.includes('/usr/bin/open'), false);
   assert.ok(source.includes(id));
-  assert.equal(launcherIdentifier(id), 'io.github.lyhuuloi.ben-claude-multi.p' + id.replace(/-/g, ''));
+  assert.equal(launcherIdentifier(id), 'io.github.lyhuuloi.multi-claude.p' + id.replace(/-/g, ''));
 });
 test('T085 S07 missing runtime, CLI, catalog and UUID fail closed without open', async () => {
   const fixture = desktopFixture();

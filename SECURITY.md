@@ -1,6 +1,6 @@
 # Security policy and scope
 
-ben-claude-multi selects separate Claude configuration and data locations for one
+multi-claude selects separate Claude configuration and data locations for one
 macOS user. It reduces accidental profile and credential misrouting. It does not
 establish an operating-system boundary between that user's programs. Root, a
 compromised operating system and arbitrary code already executing as the owner are

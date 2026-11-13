@@ -61,7 +61,7 @@ function selections(location: string): string[] {
 const currentCli = fileURLToPath(new URL('./main.js', import.meta.url));
 function profileRoute(profile: Profile, argv: readonly string[], command = argv.join(' ')): boolean {
   const routes = [currentCli, profile.code?.cli, profile.desktop?.cli,
-    ...argv.filter(arg => basename(arg) === 'ben-claude-multi')];
+    ...argv.filter(arg => ['multi-claude', 'ben-claude-multi'].includes(basename(arg)))];
   const spellings = routes.filter((path): path is string => typeof path === 'string').flatMap(path => {
     const base = path.replace(/^\/System\/Volumes\/Data(?=\/)/, '');
     return isAbsolute(base) ? [path, base, '/System/Volumes/Data' + base] : [path];

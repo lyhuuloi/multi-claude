@@ -72,7 +72,7 @@ export class HealthReview {
   async inventory(): Promise<HealthReport> {
     const { work } = this;
     const file = join(work.where.control, 'catalog.json');
-    work.out(`ben-claude-multi ${releaseVersion}; installation: ${work.code.cli}`);
+    work.out(`multi-claude ${releaseVersion}; installation: ${work.code.cli}`);
     work.out(`Catalog: ${file}`);
     const loaded = readCatalog(file, work.io);
     const catalog = loaded.catalog;
@@ -580,7 +580,7 @@ export class HealthReview {
   }
   async apply(): Promise<number> {
     const { work } = this;
-    work.out(`ben-claude-multi ${releaseVersion}; installation: ${work.code.cli}`);
+    work.out(`multi-claude ${releaseVersion}; installation: ${work.code.cli}`);
     const initial = readCatalog(join(work.where.control, 'catalog.json'), work.io).catalog;
     if (!initial.profiles.length) {
       const report = await this.inventory();

@@ -1,4 +1,4 @@
-# ben-claude-multi
+# multi-claude
 
 Run several Claude accounts side by side on one Mac. Each account gets its own
 Claude Code command and, if you want, its own Claude Desktop window, with a
@@ -38,15 +38,15 @@ No Anthropic software is redistributed; the tool verifies and copies your instal
 From source (the package is not on npm yet):
 
 ```sh
-git clone https://github.com/lyhuuloi/ben-claude-multi.git
-cd ben-claude-multi
+git clone https://github.com/lyhuuloi/multi-claude.git
+cd multi-claude
 npm ci
 npm test
 npm run install-local
 ```
 
 Update later with `git pull`, then `npm ci` and `npm run install-local` again.
-After an update that changes launchers, run `ben-claude-multi repair <label>` once per Desktop profile.
+After an update that changes launchers, run `multi-claude repair <label>` once per Desktop profile.
 
 ## Quick start
 
@@ -55,7 +55,7 @@ Run these from Terminal.app, not from inside a Claude session.
 ### A second Claude Code account
 
 ```sh
-ben-claude-multi add work --target terminal
+multi-claude add work --target terminal
 ```
 
 Open a new terminal, run `claude-work`, then `/login` with the second account.
@@ -63,7 +63,7 @@ Open a new terminal, run `claude-work`, then `/login` with the second account.
 ### A second Claude Desktop account (with its own Code)
 
 ```sh
-ben-claude-multi add work --target paired
+multi-claude add work --target paired
 ```
 
 The tool asks a few questions; press Return to accept each default. Then:
@@ -79,16 +79,23 @@ During `add`, answer `y` to `Also add a shortcut in /Applications?` (default is 
 For an existing profile:
 
 ```sh
-ben-claude-multi repair work --shortcut
+multi-claude repair work --shortcut
 ```
 
 The shortcut is a link to the real launcher. `rename` moves it, `remove` deletes it,
 `repair work --no-shortcut` drops it. It is off by default because `/Applications`
 can be changed by any administrator of the Mac; see [Security](SECURITY.md).
 
+### Coming from ben-claude-multi
+
+The tool was first called `ben-claude-multi`. An existing registry under
+`~/.config/ben-claude-multi` and `~/.local/share/ben-claude-multi` keeps working in place.
+After installing this version, run `multi-claude doctor --apply`, then
+`multi-claude repair <label>` for each Desktop profile, then `npm rm -g ben-claude-multi`.
+
 ## Commands
 
-Use `ben-claude-multi` before each command. Run `ben-claude-multi help` for all options.
+Use `multi-claude` before each command. Run `multi-claude help` for all options.
 
 | Command | What it does |
 | --- | --- |
@@ -108,9 +115,9 @@ Use `ben-claude-multi` before each command. Run `ben-claude-multi help` for all 
 
 | What | Where |
 | --- | --- |
-| Profile list | `~/.config/ben-claude-multi/catalog.json` |
-| Profile data (Code and Desktop) | `~/.local/share/ben-claude-multi/<label>/` |
-| Private copy of Claude.app per Desktop profile | `~/.config/ben-claude-multi/bundles.noindex/` |
+| Profile list | `~/.config/multi-claude/catalog.json` |
+| Profile data (Code and Desktop) | `~/.local/share/multi-claude/<label>/` |
+| Private copy of Claude.app per Desktop profile | `~/.config/multi-claude/bundles.noindex/` |
 | Launchers | `~/Applications/Claude Profiles/Claude <label>.app` |
 | Optional shortcut | `/Applications/Claude <label>.app` |
 | Shell command | one marked block in your shell rc file |
@@ -150,10 +157,10 @@ update the main Claude as usual, then reopen the profile from its launcher.
 
 | Symptom | Do this |
 | --- | --- |
-| "The profile engine is missing" | Update the tool, then `ben-claude-multi repair <label>` |
+| "The profile engine is missing" | Update the tool, then `multi-claude repair <label>` |
 | The launcher is not in Applications | It is in `~/Applications/Claude Profiles`; add a shortcut with `repair <label> --shortcut` |
 | A sign-in link opens the wrong Claude window | Enter the email code by hand in the window you want |
-| Anything else | `ben-claude-multi doctor` |
+| Anything else | `multi-claude doctor` |
 
 ## More
 

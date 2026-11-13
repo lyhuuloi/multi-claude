@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Renamed from `ben-claude-multi` to `multi-claude`: package, command, help text and launcher
+  identifier. A registry under `~/.config/ben-claude-multi` and `~/.local/share/ben-claude-multi`
+  keeps working in place. After installing, run `multi-claude doctor --apply` and
+  `multi-claude repair <label>` for each Desktop profile, then remove the old global package.
+
 - Optional `/Applications` shortcut for a Desktop launcher. `add` asks (default no);
   `repair <label> --shortcut` adds or adopts one and `--no-shortcut` drops it. `rename`, `remove`,
   `status` and `doctor` follow it. The link is never a managed root; see SECURITY.md.
@@ -23,7 +28,7 @@
 
 ## 1.0.0
 
-Initial release of ben-claude-multi for macOS and Node.js 20 or newer.
+Initial release of multi-claude for macOS and Node.js 20 or newer.
 
 Desktop and paired flows are experimental; see README Status.
 

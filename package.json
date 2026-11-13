@@ -1,13 +1,13 @@
 {
-  "name": "ben-claude-multi",
+  "name": "multi-claude",
   "version": "1.0.0",
   "description": "Manage separate Claude Code and Claude Desktop configuration profiles on macOS.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lyhuuloi/ben-claude-multi.git"
+    "url": "git+https://github.com/lyhuuloi/multi-claude.git"
   },
-  "homepage": "https://github.com/lyhuuloi/ben-claude-multi#readme",
-  "bugs": "https://github.com/lyhuuloi/ben-claude-multi/issues",
+  "homepage": "https://github.com/lyhuuloi/multi-claude#readme",
+  "bugs": "https://github.com/lyhuuloi/multi-claude/issues",
   "author": "Loi Ly",
   "keywords": ["claude", "claude-code", "macos", "profiles", "cli"],
   "os": ["darwin"],
@@ -20,7 +20,7 @@
     "typescript": "7.0.2"
   },
   "bin": {
-    "ben-claude-multi": "dist/src/main.js"
+    "multi-claude": "dist/src/main.js"
   },
   "files": [
     "dist/",

@@ -10,7 +10,7 @@ export function reviewPackage(manifest: JsonObject, lock: JsonObject, developmen
   const refuse = () => {
     throw new Error('The package or reviewed dependency lock does not match the distribution contract.');
   };
-  if (manifest.name !== 'ben-claude-multi' || manifest.version !== '1.0.0' || manifest.type !== 'module'
+  if (manifest.name !== 'multi-claude' || manifest.version !== '1.0.0' || manifest.type !== 'module'
     || JSON.stringify(manifest.files) !== JSON.stringify(distributionFiles)
     || JSON.stringify(lock) !== JSON.stringify(developmentLock) || lock.lockfileVersion !== 3
     || lock.name !== manifest.name || lock.version !== manifest.version) {

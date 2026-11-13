@@ -37,5 +37,5 @@ export function maintenanceFinding(catalog: Catalog, control: string, cli: strin
   } catch {
     return 'Maintenance state is unsafe or unreadable; review with doctor before applying repairs.';
   }
-  return 'Generated resources need review for this installation. Run ben-claude-multi doctor --apply.';
+  return 'Generated resources need review for this installation. Run multi-claude doctor --apply.';
 }

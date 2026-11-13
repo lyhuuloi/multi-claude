@@ -5,6 +5,7 @@ import { canonicalLocation, protectedPath, refuseOverlap, baselineLocations } fr
 import { PrivateIO } from './private-io.js';
 import type { FileImage } from './private-io.js';
 import { Problem, Exit } from './outcomes.js';
+// The catalog format id keeps the tool's first name so existing registries stay readable.
 export const formatTag = 'ben-claude-multi/catalog@1';
 export type RootRole = 'code' | 'desktop' | 'policy' | 'launcher' | 'copy';
 export interface RootEvidence {
@@ -91,7 +92,7 @@ const choices = (x: unknown, values: readonly string[]): boolean => text(x) && v
 export const validLabel = (x: unknown): x is string => text(x) && x !== 'baseline' &&
 /^[a-z](?:[a-z0-9-]{0,46}[a-z0-9])?$/.test(x);
 export const validCommand = (x: unknown): x is string => text(x) && /^[a-z](?:[a-z0-9-]*[a-z0-9])?$/.test(x) &&
-!['claude', 'ben-claude-multi'].includes(x);
+!['claude', 'multi-claude', 'ben-claude-multi'].includes(x);
 function requireValue(value: unknown): asserts value {
   if (!value) {
     throw new Problem('catalog-schema', 'The catalog structure is invalid.',

@@ -74,15 +74,15 @@ test('T155 T157 T158 S68 S69 offline production installation uses a temporary pr
   assert.ok(inside(root, prefix), 'Production installation must use the declared temporary prefix.');
   npmCommand(['install', '--global', '--offline', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund',
     '--prefix', prefix, archive], destination);
-  const installed = join(prefix, 'lib/node_modules/ben-claude-multi');
+  const installed = join(prefix, 'lib/node_modules/multi-claude');
   assert.equal(existsSync(join(installed, 'node_modules/typescript')), false);
   assert.equal(existsSync(join(installed, 'node_modules/@types')), false);
   assert.equal(existsSync(join(installed, 'dist/test')), false);
   for (const command of ['version', 'help']) {
-    const result = spawnSync(join(prefix, 'bin/ben-claude-multi'), [command], {
+    const result = spawnSync(join(prefix, 'bin/multi-claude'), [command], {
       env, cwd: destination, encoding: 'utf8', timeout: 10000, maxBuffer: 65536,
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /ben-claude-multi 1\.0\.0/);
+    assert.match(result.stdout, /multi-claude 1\.0\.0/);
   }
 });

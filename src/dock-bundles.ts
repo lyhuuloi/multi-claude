@@ -31,7 +31,7 @@ export function launcherIdentifier(profileId: string): string {
   if (!uuid(profileId)) {
     throw new Problem('launcher-id', 'A launcher requires a profile UUID.');
   }
-  return 'io.github.lyhuuloi.ben-claude-multi.p' + profileId.replace(/-/g, '');
+  return 'io.github.lyhuuloi.multi-claude.p' + profileId.replace(/-/g, '');
 }
 export function launcherSource(runtime: string, cli: string, profileId: string, catalog: string): string {
   launcherIdentifier(profileId);
@@ -46,7 +46,7 @@ export function launcherSource(runtime: string, cli: string, profileId: string, 
     '  try',
     `    do shell script ${appleString(check)}`,
     '  on error',
-    '    display dialog "The profile engine is missing. Run ben-claude-multi doctor." '
+    '    display dialog "The profile engine is missing. Run multi-claude doctor." '
     + 'buttons {"Close"} default button "Close"',
     '    return',
     '  end try',

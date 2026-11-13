@@ -1,6 +1,6 @@
-Full behaviour, recovery, validation and development details for ben-claude-multi.
+Full behaviour, recovery, validation and development details for multi-claude.
 
-# ben-claude-multi
+# multi-claude
 
 Manage additional Claude Desktop and Claude Code profiles for one macOS user. Each
 profile selects its own configuration and application data locations. Profiles can
@@ -59,9 +59,9 @@ production-install check can be run entirely offline after building:
 trial=$(mktemp -d "${TMPDIR:-/tmp}/bcm-install.XXXXXX")
 npm pack --offline --ignore-scripts --pack-destination "$trial"
 npm install -g --offline --omit=dev --ignore-scripts --no-audit --no-fund \
-  --prefix "$trial/prefix" "$trial/ben-claude-multi-1.0.0.tgz"
-"$trial/prefix/bin/ben-claude-multi" version
-"$trial/prefix/bin/ben-claude-multi" help
+  --prefix "$trial/prefix" "$trial/multi-claude-1.0.0.tgz"
+"$trial/prefix/bin/multi-claude" version
+"$trial/prefix/bin/multi-claude" help
 ```
 
 After reviewing the result, remove this disposable directory. `npm run install-local`
@@ -72,9 +72,9 @@ before running it. There is no registry updater or background service.
 
 ## Locations and commands
 
-`C` is `$XDG_CONFIG_HOME/ben-claude-multi`, normally
-`~/.config/ben-claude-multi`. `D` is `$XDG_DATA_HOME/ben-claude-multi`, normally
-`~/.local/share/ben-claude-multi`. XDG parents must be absolute and safe.
+`C` is `$XDG_CONFIG_HOME/multi-claude`, normally
+`~/.config/multi-claude`. `D` is `$XDG_DATA_HOME/multi-claude`, normally
+`~/.local/share/multi-claude`. XDG parents must be absolute and safe.
 
 | Resource | Default |
 | --- | --- |
@@ -107,7 +107,7 @@ Before rename/remove, quit manually wrapped sessions whose environments `ps -E` 
 
 ## A first profile
 
-Run `ben-claude-multi add studio --target paired`. Choose the source Claude.app,
+Run `multi-claude add studio --target paired`. Choose the source Claude.app,
 data locations, launcher, optional tint, shell and terminal command. Decline setup
 import for a clean start. GitHub configuration is optional. The final plan lists
 completed, requested and skipped surfaces, all destinations and shell changes.
@@ -116,7 +116,7 @@ profile and shell unchanged.
 
 Approve the plan, then reload the recorded rc file or open a new terminal. Run
 `claude-studio` and sign in inside that Code profile. Open Desktop using the reported
-launcher or `ben-claude-multi open-profile studio`, and sign in to the intended
+launcher or `multi-claude open-profile studio`, and sign in to the intended
 account there. Creation itself does not launch Claude or authenticate for you.
 
 If Desktop is unavailable, skip it and keep Code. If one surface fails, its work
@@ -155,9 +155,9 @@ For optional private GitHub CLI configuration, use the exact quoted directory
 reported by setup, for example:
 
 ```sh
-GH_CONFIG_DIR="$HOME/.local/share/ben-claude-multi/studio/code/github" \
+GH_CONFIG_DIR="$HOME/.local/share/multi-claude/studio/code/github" \
   gh auth login --insecure-storage
-GH_CONFIG_DIR="$HOME/.local/share/ben-claude-multi/studio/code/github" gh auth logout
+GH_CONFIG_DIR="$HOME/.local/share/multi-claude/studio/code/github" gh auth logout
 ```
 
 `--insecure-storage` is necessary here to select file-backed tokens. They are

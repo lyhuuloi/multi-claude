@@ -1,5 +1,6 @@
 import { join, isAbsolute, dirname } from 'node:path';
 import { lstatSync } from 'node:fs';
+import { present } from './managed-resources.js';
 import type { Readable, Writable } from 'node:stream';
 import { PrivateIO } from './private-io.js';
 import { readCatalog, verifyRoot, validateLocations, validLabel, uuid } from './profile-catalog.js';
@@ -115,8 +116,8 @@ export function invocation(command: string, args: readonly string[]): Invocation
   return { positional, options, tail };
 }
 const help =
-`ben-claude-multi ${releaseVersion}
-Usage: ben-claude-multi <command>
+`multi-claude ${releaseVersion}
+Usage: multi-claude <command>
   add [label] [--target desktop|terminal|paired]     Create or link selected surfaces
   run-profile <label> [-- ...]                       Start the shared Claude Code executable
   run-profile --profile-id UUID [-- ...]             Resolve a stable shell entry
@@ -134,6 +135,7 @@ Usage: ben-claude-multi <command>
 Rename and remove accept --ignore-process-check; ownership checks still apply.
 Setup transfer requires explicit item selection. Doctor reports disk evidence and session uncertainty separately.
 `;
+const legacyName = 'ben-claude-multi';
 export function locations(env: NodeJS.ProcessEnv): ProfileLocations {
   const home = env.HOME;
   if (!home || !isAbsolute(home)) {
@@ -144,8 +146,11 @@ export function locations(env: NodeJS.ProcessEnv): ProfileLocations {
   const data = env.XDG_DATA_HOME ?? join(home, '.local/share');
   protectedPath(config);
   protectedPath(data);
-  const control = join(config, 'ben-claude-multi');
-  const dataParent = join(data, 'ben-claude-multi');
+  // A registry created under the tool's first name keeps working in place until the owner moves it.
+  const name = !present(join(config, 'multi-claude')) && present(join(config, legacyName))
+    ? legacyName : 'multi-claude';
+  const control = join(config, name);
+  const dataParent = join(data, name);
   refuseOverlap(control, baselineLocations(home));
   refuseOverlap(dataParent, [...baselineLocations(home), control]);
   return { home, control, data: dataParent };
@@ -304,7 +309,7 @@ export async function runFront(argv: readonly string[], ctx: FrontContext): Prom
       return Exit.ok;
     }
     if (command === 'version') {
-      ctx.output.write(`ben-claude-multi ${releaseVersion}\n`);
+      ctx.output.write(`multi-claude ${releaseVersion}\n`);
       return Exit.ok;
     }
     if (ctx.platform !== 'darwin') {
@@ -382,7 +387,7 @@ export async function runFront(argv: readonly string[], ctx: FrontContext): Prom
       return await new TransferActions(lifecycle).copy(positional[0], positional[1], options.has('--replace-selected'));
     }
     if (command === 'doctor' && options.has('--recover')) {
-      out(`ben-claude-multi ${releaseVersion}; installation: ${services.cli}`);
+      out(`multi-claude ${releaseVersion}; installation: ${services.cli}`);
       const recovery = new RecoveryActions(lifecycle, ctx.healthServices ?? productionHealthServices(ctx.env));
       return await recovery.recover(options.get('--recover') as string);
     }
