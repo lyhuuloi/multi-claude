@@ -211,6 +211,15 @@ stays untouched while a new launcher is installed at an unused location. Dock
 restart needs its own approval or `--refresh-dock`; no global LaunchServices reset
 or quarantine removal is performed.
 
+A shortcut in `/Applications` is optional and off by default. `add` asks for it,
+`repair studio --shortcut` adds or adopts one later and `--no-shortcut` drops it.
+It is a symbolic link named `Claude <label>.app` that points at the launcher; the
+launcher, the application copy and all data stay in owner-only locations. The link
+is derived state: it is written only after the catalog commit, follows `rename`,
+is deleted by `remove`, and a failure to write it never fails the command. The tool
+touches it only while it is a link owned by this user that names the profile's
+launcher; anything else at that name is preserved and reported by `doctor`.
+
 ## Read rules and shared storage
 
 Generated Code rules protect sibling Code and Desktop roots, `-3p` policy roots,

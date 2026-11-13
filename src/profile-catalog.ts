@@ -40,6 +40,7 @@ export interface DesktopSurface {
   runtime?: string;
   cli?: string;
   useClaudeIcon?: boolean;
+  shortcut?: string;
 }
 export interface Profile {
   id: string;
@@ -153,7 +154,11 @@ export function validateCatalog(value: unknown): Catalog {
     }
     if (object(p.desktop)) {
       const d = p.desktop;
-      fields(d, 'location source launcher tint updateMode defaultLocation defaultLauncher runtime cli useClaudeIcon');
+      fields(d, 'location source launcher tint updateMode defaultLocation defaultLauncher runtime cli useClaudeIcon shortcut');
+      if (d.shortcut !== undefined) {
+        path(d.shortcut);
+        requireValue(d.shortcut.endsWith('.app'));
+      }
       requireValue(d.useClaudeIcon === undefined || typeof d.useClaudeIcon === 'boolean');
       path(d.location);
       path(d.source);

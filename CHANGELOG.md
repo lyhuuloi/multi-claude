@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Optional `/Applications` shortcut for a Desktop launcher. `add` asks (default no);
+  `repair <label> --shortcut` adds or adopts one and `--no-shortcut` drops it. `rename`, `remove`,
+  `status` and `doctor` follow it. The link is never a managed root; see SECURITY.md.
+- README rewritten: who the tool is for, source install, quick start per profile type, where files
+  live, updates and troubleshooting.
+
 - `npm publish` now builds and runs the full test suite first through `prepublishOnly`, so a stale
   or missing local `dist/` can no longer be published.
 - Desktop and paired profiles can be created again: application copies whose helper bundles carry

@@ -15,6 +15,7 @@ import { policyView } from './desktop-policy.js';
 import { maintenanceBytes } from './maintenance-state.js';
 import { join, basename } from 'node:path';
 import { Problem, Exit } from './outcomes.js';
+import { placeShortcut } from './app-shortcut.js';
 export class SetupActions {
   private readonly actions: ProfileActions;
   constructor(
@@ -201,6 +202,10 @@ export class SetupActions {
         }
         if (completed.desktop) {
           this.out(`Launcher: ${completed.desktop.launcher}. Pin this launcher, not the running Claude tile.`);
+          if (completed.desktop.shortcut) {
+            this.out(placeShortcut(completed.desktop.shortcut, completed.desktop.launcher)
+              ?? `Shortcut: ${completed.desktop.shortcut}`);
+          }
           this.out('Prefer entering the email code directly; browser callbacks can reach a different Claude instance.');
           if (existing?.desktop && codePlan) {
             this.out('Desktop routing now selects the completed Code/GitHub roots. Reopen existing Desktop sessions.');

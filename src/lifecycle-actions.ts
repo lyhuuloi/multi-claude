@@ -23,6 +23,7 @@ import { profilePathFinding } from './profile-safety.js';
 import { protectedPath } from './location-guard.js';
 import type { DirectoryStamp } from './location-guard.js';
 import { Problem, Exit } from './outcomes.js';
+import { shortcutPath, placeShortcut, dropShortcut } from './app-shortcut.js';
 interface LabelParent {
   path: string;
   device: bigint;
@@ -176,6 +177,20 @@ export class LifecycleActions {
       }
     }
   }
+  // The shortcut is a derived link outside every managed root: it follows the catalog after a commit,
+  // is only touched while it still names this profile's launcher, and never fails the command.
+  private syncShortcut(before: Profile | null, after: Profile | null): void {
+    const old = before?.desktop;
+    const next = after?.desktop;
+    const findings: (string | null)[] = [];
+    if (old?.shortcut && (old.shortcut !== next?.shortcut || old.launcher !== next?.launcher)) {
+      findings.push(dropShortcut(old.shortcut, old.launcher));
+    }
+    if (next?.shortcut) {
+      findings.push(placeShortcut(next.shortcut, next.launcher));
+    }
+    findings.filter(value => value !== null).forEach(value => this.out(value!));
+  }
   async rename(oldLabel: string | undefined, newLabel: string | undefined, ignore: boolean): Promise<number> {
     return this.actions.locked(async (session, leases) => {
       let current = await this.select(session.catalog, oldLabel);
@@ -234,6 +249,9 @@ export class LifecycleActions {
           moves.push({ from: desktop.launcher,
             to: join(this.where.home, 'Applications/Claude Profiles', `Claude ${label}.app`), role: 'launcher' });
           desktop.launcher = moves.at(-1)!.to;
+        }
+        if (desktop.shortcut && desktop.shortcut === shortcutPath(dirname(desktop.shortcut), current.label)) {
+          desktop.shortcut = protectedPath(shortcutPath(dirname(desktop.shortcut), label));
         }
         desktop.runtime = this.code.runtime(this.env.PATH ?? '');
         desktop.cli = this.code.cli;
@@ -371,6 +389,7 @@ export class LifecycleActions {
         if (profile.desktop && this.desktop.register) {
           registration = await this.desktop.register(profile.desktop.launcher) ? Exit.ok : Exit.findings;
         }
+        this.syncShortcut(current, profile);
         const cleanup = transaction.finish();
         if (cleanup) {
           await this.actions.protectAfterFailure(session);
@@ -539,6 +558,7 @@ export class LifecycleActions {
         await this.actions.checkpoint('remove-fences');
         session.commit(next);
         committed = true;
+        this.syncShortcut(profile, null);
         const cleanup = transaction.finish();
         if (cleanup) {
           await this.actions.protectAfterFailure(session);
@@ -555,7 +575,7 @@ export class LifecycleActions {
       }
     });
   }
-  async repair(label: string | undefined, refreshDock: boolean): Promise<number> {
+  async repair(label: string | undefined, refreshDock: boolean, shortcut?: boolean): Promise<number> {
     return this.actions.locked(async (session, leases) => {
       let current = await this.select(session.catalog, label, true);
       if (!current?.desktop) {
@@ -563,11 +583,12 @@ export class LifecycleActions {
         return Exit.ok;
       }
       await leases.profile(current.id);
-      return this.repairProfile(session, current, refreshDock, true);
+      return this.repairProfile(session, current, refreshDock, true, shortcut);
     });
   }
-  async repairProfile(session: CatalogSession, current: Profile, refreshDock = false, askDock = false):
-  Promise<number> {
+  async repairProfile(
+    session: CatalogSession, current: Profile, refreshDock = false, askDock = false, shortcut?: boolean,
+  ): Promise<number> {
     checkedRoot(current, 'desktop', this.io);
     const application = await this.copy(session, current);
     current = session.catalog.profiles.find(value => value.id === current!.id)!;
@@ -575,6 +596,12 @@ export class LifecycleActions {
     const desktop = profile.desktop!;
     desktop.runtime = this.code.runtime(this.env.PATH ?? '');
     desktop.cli = this.code.cli;
+    if (shortcut === true && !desktop.shortcut && this.desktop.shortcutDirectory) {
+      desktop.shortcut = protectedPath(shortcutPath(this.desktop.shortcutDirectory, profile.label));
+    }
+    if (shortcut === false) {
+      delete desktop.shortcut;
+    }
     let root: RootEvidence | null = null;
     if (present(desktop.launcher)) {
       try {
@@ -627,6 +654,7 @@ export class LifecycleActions {
       session.commit(next);
       committed = true;
       const registered = this.desktop.register ? await this.desktop.register(desktop.launcher) : true;
+      this.syncShortcut(current, profile);
       const cleanup = transaction.finish();
       if (cleanup) {
         await this.actions.protectAfterFailure(session);

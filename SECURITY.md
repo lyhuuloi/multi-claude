@@ -52,6 +52,13 @@ launch. Signed executable/plist/resources are unchanged. Claude is never re-sign
 and quarantine metadata is never removed as a trust bypass. Failed verification
 cannot fall back to opening the baseline application.
 
+The optional `/Applications` shortcut is a convenience link and not a trusted
+location. `/Applications` is writable by every administrator of the Mac, so another
+administrator can replace the link with a different application of the same name.
+The tool therefore never treats it as a managed root, never launches through it,
+and re-checks ownership and target before changing it. Leave the shortcut off on a
+shared Mac and start profiles from `~/Applications/Claude Profiles`.
+
 A hostile same-user process can swap the bundle after final verification but before
 LaunchServices resolves its pathname. Final verification remains immediately before
 open; identity and pathname checks narrow this window but cannot close it.

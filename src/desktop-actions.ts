@@ -19,6 +19,7 @@ import { createPolicy } from './desktop-policy.js';
 import { destination, evidence, present, rootReceipt } from './managed-resources.js';
 import { connectorInventory, mergeConnectors } from './desktop-transfer.js';
 import { Problem, Exit } from './outcomes.js';
+import { shortcutPath } from './app-shortcut.js';
 export class DesktopActions {
   constructor(
     private readonly where: ProfileLocations, private readonly io: PrivateIO,
@@ -62,6 +63,10 @@ export class DesktopActions {
     if (!['none', 'amber', 'copper', 'mint', 'sky', 'violet', 'rose'].includes(tint) || !launcher.endsWith('.app')) {
       throw new Problem('desktop-plan', 'Choose a supported tint and an .app launcher destination.', Exit.usage);
     }
+    const shortcutDirectory = this.services.shortcutDirectory;
+    const shortcut = shortcutDirectory
+      && (await this.value(`Also add a shortcut in ${shortcutDirectory}? y/n`, 'n')).toLowerCase() === 'y'
+      ? protectedPath(shortcutPath(shortcutDirectory, name)) : undefined;
     if (location.toLowerCase().endsWith('-3p')) {
       throw new Problem('desktop-suffix', 'A Desktop data root cannot end in -3p.');
     }
@@ -130,6 +135,7 @@ export class DesktopActions {
       location, source, launcher, tint: tint as Tint, updateMode: 'launcher', useClaudeIcon: icon,
       defaultLocation: !dataAnswer.trim(), defaultLauncher: !dockAnswer.trim(),
       runtime: this.code.runtime(this.env.PATH ?? ''), cli: this.code.cli,
+      ...(shortcut ? { shortcut } : {}),
     };
     const plan = structuredClone(session.catalog);
     plan.profiles = plan.profiles.filter(value => value.id !== id).concat(profile);
@@ -148,6 +154,9 @@ export class DesktopActions {
     };
     await preflight();
     this.out(`Desktop data: ${location}; launcher: ${launcher}; tint: ${tint}; updater: launcher-managed.`);
+    if (shortcut) {
+      this.out(`Shortcut: ${shortcut} (a link to the launcher; other administrators of this Mac can replace it).`);
+    }
     this.out(`Connectors selected: ${selected.join(', ') || 'none'}. Existing foreign policy is never changed.`);
     return {
       profile, reused: [...(reuse?.retirementIds ?? []), ...(policyReuse?.retirementIds ?? [])], preflight,

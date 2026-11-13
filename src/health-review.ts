@@ -25,6 +25,7 @@ import { releaseVersion } from './release.js';
 import type { HealthServices } from './health-services.js';
 import { locationKey } from './location-guard.js';
 import { Problem, Exit, shellQuote } from './outcomes.js';
+import { shortcutState } from './app-shortcut.js';
 export interface HealthIssue {
   label: string;
   area: string;
@@ -286,6 +287,19 @@ export class HealthReview {
           }
           work.out(`${profile.label}: launcher identifier, fixed UUID route and synchronous wait match.`);
         });
+        const shortcut = profile.desktop.shortcut;
+        if (shortcut) {
+          const launcher = profile.desktop.launcher;
+          await this.check(issues, profile.label, 'shortcut', () => {
+            const state = shortcutState(shortcut, launcher);
+            if (state !== 'present') {
+              throw new Problem('shortcut', state === 'missing'
+                ? `The shortcut ${shortcut} is missing. Run repair ${profile.label}.`
+                : `${shortcut} is not this profile's link. Remove it yourself or run repair ${profile.label} --no-shortcut.`);
+            }
+            work.out(`${profile.label}: shortcut links to the launcher.`);
+          });
+        }
         await this.check(issues, profile.label, 'policy', () => {
           const view = policyView(profile, work.io);
           work.out(`${profile.label}: desired updates ${profile.desktop!.updateMode}; on-disk policy `

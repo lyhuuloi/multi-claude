@@ -50,7 +50,7 @@ const commands: Readonly<Record<string, CommandSpec>> = Object.freeze({
   doctor: { max: 0, options: { '--apply': 'switch', '--recover': 'uuid' } },
   remove: { max: 1, options: { '--ignore-process-check': 'switch' } },
   rename: { max: 2, options: { '--ignore-process-check': 'switch' } },
-  repair: { max: 1, options: { '--refresh-dock': 'switch' } },
+  repair: { max: 1, options: { '--refresh-dock': 'switch', '--shortcut': 'switch', '--no-shortcut': 'switch' } },
   'copy-setup': { max: 2, options: { '--replace-selected': 'switch' } },
   'desktop-updates': { max: 2 },
   'open-profile': { max: 1 },
@@ -126,7 +126,8 @@ Usage: ben-claude-multi <command>
   list                                               Show profiles and baseline locations
   status [label]                                     Inspect recorded roots and shell entries
   doctor [--apply | --recover UUID]                  Audit health, apply safe repairs, or review unfinished work
-  repair [label] [--refresh-dock]                    Repair the verified Desktop launcher
+  repair [label] [--refresh-dock] [--shortcut|--no-shortcut]
+                                                     Repair the launcher; add or drop its /Applications link
   copy-setup [source] [target] [--replace-selected]  Transfer selected Desktop setup
   desktop-updates [label] [launcher|application]     Inspect or change owned update policy
   help | version                                     Show usage or release information
@@ -191,6 +192,9 @@ async function inspect(
     }
     if (profile.desktop) {
       out(`Desktop root: ${profile.desktop.location}; launcher: ${profile.desktop.launcher}`);
+      if (profile.desktop.shortcut) {
+        out(`Shortcut: ${profile.desktop.shortcut}`);
+      }
     }
     if (command !== 'list') {
       const required = [
@@ -365,7 +369,11 @@ export async function runFront(argv: readonly string[], ctx: FrontContext): Prom
       return await lifecycle.remove(positional[0], options.has('--ignore-process-check'));
     }
     if (command === 'repair') {
-      return await lifecycle.repair(positional[0], options.has('--refresh-dock'));
+      if (options.has('--shortcut') && options.has('--no-shortcut')) {
+        throw new Problem('arguments', 'Choose --shortcut or --no-shortcut, not both.', Exit.usage);
+      }
+      return await lifecycle.repair(positional[0], options.has('--refresh-dock'),
+        options.has('--shortcut') ? true : options.has('--no-shortcut') ? false : undefined);
     }
     if (command === 'desktop-updates') {
       return await lifecycle.updates(positional[0], positional[1]);

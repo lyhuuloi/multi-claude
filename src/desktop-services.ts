@@ -29,6 +29,7 @@ export interface DesktopServices extends DesktopArtifacts {
   refreshDock?(launcher: string): Promise<void>;
   checkpoint?(stage: string): Promise<void> | void;
   contentionMs?: number;
+  shortcutDirectory?: string;
 }
 const tintScript = String.raw`ObjC.import('AppKit');
 function run(argv) {
@@ -124,6 +125,7 @@ export function productionDesktopServices(): DesktopServices {
   return {
     ...artifacts,
     identities: nativeIdentities(),
+    shortcutDirectory: '/Applications',
     census: () => desktopNativeCensus(),
     async confirmWrong(label) {
       const script = 'on run argv\n'

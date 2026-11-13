@@ -1,36 +1,90 @@
 # ben-claude-multi
 
-Run several Claude Code and Claude Desktop accounts side by side on one Mac, each with its own login and settings.
+Run several Claude accounts side by side on one Mac. Each account gets its own
+Claude Code command and, if you want, its own Claude Desktop window, with a
+separate login and separate settings. Your normal Claude install is left alone.
+
+```text
+claude            -> your normal account (untouched)
+claude-work       -> account 2, own login, own settings
+Claude work.app   -> account 2 in its own Claude Desktop window
+```
 
 Independent and unofficial; not affiliated with, endorsed by or supported by Anthropic.
 Claude, Claude Code and Claude Desktop are Anthropic trademarks, used to describe compatibility.
 No Anthropic software is redistributed; the tool verifies and copies your installed Claude.app locally.
 
+## Who it is for
+
+- You have a personal and a work Claude subscription and switch between them all day.
+- You want two Claude Desktop windows open at once, each signed in to a different account.
+- You run agents under one account and want your own work under another.
+
 ## Status
 
-- Code (terminal) profiles: tested end to end on a real Mac (version 1.0.0).
-- Desktop and paired profiles: experimental, not yet tested end to end. Back up important Claude Desktop data.
+| Part | State |
+| --- | --- |
+| Code (terminal) profiles | Tested end to end on a real Mac |
+| Desktop and paired profiles | Experimental. Creation, launch and update blocking are fixed after 1.0.0; long-term use with two signed-in accounts is still being verified. Back up important Claude Desktop data first. |
 
 ## Requirements
 
-macOS, Node.js 20+, and Claude Code and/or Claude Desktop.
+- macOS
+- Node.js 20 or newer
+- Claude Code and/or Claude Desktop already installed
 
 ## Install
 
+From source (the package is not on npm yet):
+
 ```sh
-npm install -g ben-claude-multi
+git clone https://github.com/lyhuuloi/ben-claude-multi.git
+cd ben-claude-multi
+npm ci
+npm test
+npm run install-local
 ```
 
-From source: clone this repository, then run `npm ci`, `npm test` and `npm run install-local`.
+Update later with `git pull`, then `npm ci` and `npm run install-local` again.
+After an update that changes launchers, run `ben-claude-multi repair <label>` once per Desktop profile.
 
 ## Quick start
 
-1. Run `ben-claude-multi add` and answer the questions. Choose terminal, desktop or paired.
-2. Reload your shell or open a new terminal.
-3. For Code, run `claude-<label>` and sign in.
-4. Optional GitHub login: `GH_CONFIG_DIR="<path printed by the tool>" gh auth login --insecure-storage`.
-   This stores the token as plaintext in the private profile folder.
-5. For Desktop, open the launcher in `~/Applications/Claude Profiles` and pin that launcher to the Dock.
+Run these from Terminal.app, not from inside a Claude session.
+
+### A second Claude Code account
+
+```sh
+ben-claude-multi add work --target terminal
+```
+
+Open a new terminal, run `claude-work`, then `/login` with the second account.
+
+### A second Claude Desktop account (with its own Code)
+
+```sh
+ben-claude-multi add work --target paired
+```
+
+The tool asks a few questions; press Return to accept each default. Then:
+
+1. Open `Claude work` from `~/Applications/Claude Profiles` (your home folder's Applications,
+   not the system one) and sign in.
+2. Keep that launcher in the Dock. Always start the profile from the launcher,
+   never from the running Claude tile or Spotlight.
+
+### Optional: show the launcher in /Applications
+
+During `add`, answer `y` to `Also add a shortcut in /Applications?` (default is no).
+For an existing profile:
+
+```sh
+ben-claude-multi repair work --shortcut
+```
+
+The shortcut is a link to the real launcher. `rename` moves it, `remove` deletes it,
+`repair work --no-shortcut` drops it. It is off by default because `/Applications`
+can be changed by any administrator of the Mac; see [Security](SECURITY.md).
 
 ## Commands
 
@@ -44,21 +98,47 @@ Use `ben-claude-multi` before each command. Run `ben-claude-multi help` for all 
 | `doctor [--apply \| --recover UUID]` | Check health, repair or review recovery |
 | `rename [old] [new]` | Rename a profile |
 | `remove [label]` | Remove a profile registration |
-| `repair [label] [--refresh-dock]` | Repair a Desktop launcher |
+| `repair [label] [--refresh-dock] [--shortcut \| --no-shortcut]` | Rebuild a Desktop launcher; add or drop its `/Applications` shortcut |
 | `copy-setup [source] [target] [--replace-selected]` | Copy selected Desktop setup |
 | `desktop-updates [label] [launcher\|application]` | Check or change update policy |
 | `open-profile [label]` | Open or focus a Desktop profile |
 | `run-profile <label> [-- ...]` | Run Claude Code with this profile |
 
+## Where things live
+
+| What | Where |
+| --- | --- |
+| Profile list | `~/.config/ben-claude-multi/catalog.json` |
+| Profile data (Code and Desktop) | `~/.local/share/ben-claude-multi/<label>/` |
+| Private copy of Claude.app per Desktop profile | `~/.config/ben-claude-multi/bundles.noindex/` |
+| Launchers | `~/Applications/Claude Profiles/Claude <label>.app` |
+| Optional shortcut | `/Applications/Claude <label>.app` |
+| Shell command | one marked block in your shell rc file |
+
 ## What is separated and what is not
 
+Separated:
+
 - Each profile has its own Claude configuration and login; sign in separately.
+- A Desktop profile runs from its own copy of Claude.app with its own data folder.
 - Profiles get Read deny rules for each other. Read is enforced; Grep/Glob coverage is best-effort.
-  Bash and MCP are not covered.
-- Git credentials, SSH keys and commit identity stay shared. `doctor` reports them.
-- Some Claude caches and logs stay shared.
-- Your normal `~/.claude` and `~/.claude.json` are never modified by this tool.
-- This is not a sandbox, and profiles are not separate macOS users.
+
+Still shared:
+
+- Git credentials, SSH keys and commit identity. `doctor` reports them.
+- Keychain, some Claude caches, logs and the `claude://` link handler.
+- Bash and MCP tools are not covered by the Read rules.
+
+Never touched: your normal `~/.claude`, `~/.claude.json`, `/Applications/Claude.app`
+and the main Claude Desktop data.
+
+This is not a sandbox, and profiles are not separate macOS users.
+
+## Updates of Claude Desktop
+
+A Desktop profile does not update itself. Its launcher refreshes the private copy
+from your main Claude.app when that one is newer and the profile is closed. So:
+update the main Claude as usual, then reopen the profile from its launcher.
 
 ## Rename and remove
 
@@ -66,10 +146,19 @@ Use `ben-claude-multi` before each command. Run `ben-claude-multi help` for all 
 - Quit a profile's sessions first. Sessions started with `claude-<label>` are detected automatically;
   sessions started by hand through other wrappers may not be.
 
+## Troubleshooting
+
+| Symptom | Do this |
+| --- | --- |
+| "The profile engine is missing" | Update the tool, then `ben-claude-multi repair <label>` |
+| The launcher is not in Applications | It is in `~/Applications/Claude Profiles`; add a shortcut with `repair <label> --shortcut` |
+| A sign-in link opens the wrong Claude window | Enter the email code by hand in the window you want |
+| Anything else | `ben-claude-multi doctor` |
+
 ## More
 
-- [Full details](https://github.com/lyhuuloi/ben-claude-multi/blob/main/docs/DETAILS.md):
-  behaviour, recovery, validation and development, including the agent-only test mode.
+- [Full details](docs/DETAILS.md): behaviour, recovery, validation and development,
+  including the agent-only test mode.
 - [Security](SECURITY.md): security model and private vulnerability reporting.
 - [Changelog](CHANGELOG.md): release notes.
 
