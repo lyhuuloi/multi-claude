@@ -160,6 +160,14 @@ export class HealthReview {
       ];
       for (const role of roles) {
         await this.check(issues, profile.label, role + ' identity', () => {
+          if (role === 'copy') {
+            const vault = new ApplicationVault(work.where.control, work.io, work.desktop,
+              new CatalogSession(work.io, work.where.control), profile, () => work.idle(profile, false, true), work.out);
+            const classification = vault.classifyCopy();
+            if (classification.kind === 'displaced') {
+              throw new Problem('copy-displaced', vault.displacedMessage());
+            }
+          }
           checkedRoot(profile, role, work.io);
           work.out(`${profile.label}: ${role} identity, parent trust and receipt match.`);
         });
@@ -242,6 +250,9 @@ export class HealthReview {
           work.out(`${profile.label}: source passed deep strict pinned verification.`);
         });
         await this.check(issues, profile.label, 'copy signature', async () => {
+          if (vault.classifyCopy().kind === 'displaced') {
+            throw new Problem('copy-displaced', vault.displacedMessage());
+          }
           if (!await vault.existing()) {
             throw new Problem('copy-missing',
               'The dedicated copy is absent or invalid; no fallback launch is permitted.');
@@ -403,6 +414,11 @@ export class HealthReview {
         work.io.guard.chain(recovery);
         for (const name of readdirSync(recovery)) {
           if (!claimed.has(name)) {
+            if (/^displaced-[0-9a-f-]{36}-[0-9a-f-]{36}$/.test(name)) {
+              work.out(`Replaced application preserved at ${join(recovery, name, 'Claude.app')}; `
+                + 'it can be removed after review.');
+              continue;
+            }
             this.issue(issues, 'installation', 'unrecognized recovery',
               'Uninventoried material exists in the private recovery parent; preserve it for manual review.');
           }
@@ -524,7 +540,7 @@ export class HealthReview {
       () => work.idle(current, false, true), work.out);
     await vault.source();
     await vault.recover();
-    const valid = await vault.existing();
+    const valid = vault.classifyCopy().kind === 'displaced' ? false : await vault.existing();
     const copy = valid ? await work.desktop.version(vault.application) : null;
     const source = await work.desktop.version(current.desktop!.source);
     if (!valid || (current.desktop!.updateMode === 'launcher' && compareVersions(source, copy) === 1)) {

@@ -88,7 +88,7 @@ export class LifecycleActions {
       () => this.idle(profile, false, true), this.out);
     await vault.source();
     await vault.recover();
-    if (await vault.existing()) {
+    if (vault.classifyCopy().kind !== 'displaced' && await vault.existing()) {
       return vault.application;
     }
     await this.idle(profile, false, true);

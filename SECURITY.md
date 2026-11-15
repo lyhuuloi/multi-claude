@@ -35,7 +35,12 @@ objects with expected images. Rollback owns only unchanged results produced by t
 operation. Concurrent edits and changed installed trees survive. Recursive cleanup
 requires identity and sealed-tree evidence, without following links. Successful
 operations and clean rollback discard temporary pre-images; there is no persistent
-successful-operation backup history. Retained recovery is private, inventoried and
+successful-operation backup history. The exception is an externally replaced dedicated
+application copy: after independent parent, owner and receipt checks, it is renamed to
+private `recovery/displaced-<profileId>-<uuid>/Claude.app` storage for manual review.
+These archives are never adopted as owned roots, restored, or automatically deleted,
+including by repair, rename and remove. Only the verified source supplies a fresh copy.
+Retained recovery is private, inventoried and
 read-protected. Confirmed recovery checks current registration scope and cannot
 revive a removed profile or silently lower current protection.
 
