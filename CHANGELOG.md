@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Documented how to manually bring Desktop Code-tab sessions to another account in the same profile.
+
 - The interactive `add` target menu now lists Terminal, Desktop, then Paired, and defaults
   to Terminal. Interactive users who typed target numbers should re-check their selection;
   `--target` is unaffected.

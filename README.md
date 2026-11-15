@@ -114,6 +114,46 @@ running tile all bypass the profile.
 
 To check it worked: `multi-claude status work`.
 
+### Switch a Desktop profile to another Claude account and keep its sessions
+
+The Code-tab sidebar is scoped to the signed-in account and organization. After you sign in
+to another account, its list can be empty even though the old list and the shared Code
+transcripts are still on disk. This is a manual workaround using Claude Desktop's on-disk
+layout, not a supported Claude feature; it may change with Desktop updates.
+
+1. Fully quit the profile's Claude Desktop window. Run `multi-claude status <label>` and use
+   the `Desktop root:` path it prints. `~/.local/share/multi-claude/<label>/desktop` is only
+   the default; older registries may use a different control directory. Note the account
+   folders in that Desktop root's `claude-code-sessions` directory.
+2. Open the profile with its launcher, sign in to the new account, then fully quit Desktop again.
+   In `claude-code-sessions`, the account folder that did not exist before is the new one.
+   Inside each account folder, find the organization folder containing the session files. If
+   the new account folder already existed, identify the correct account and organization folders
+   before continuing.
+3. Back up the whole `claude-code-sessions` directory to a separate location. Choose a backup
+   path that does not already exist, for example:
+
+   ```sh
+   cp -pR "<desktop root>/claude-code-sessions" "<backup path>"
+   ```
+
+4. Copy the session records and archive index into the new account's organization folder. Replace
+   the placeholders with the actual paths; `cp -pn` keeps any files already at the destination.
+   Omit the second command if the old folder has no archive index.
+
+   ```sh
+   cp -pn "<desktop root>/claude-code-sessions/<old-account>/<old-org>/"local_*.json "<desktop root>/claude-code-sessions/<new-account>/<new-org>/"
+   cp -pn "<desktop root>/claude-code-sessions/<old-account>/<old-org>/archived-sessions.idx" "<desktop root>/claude-code-sessions/<new-account>/<new-org>/"
+   ```
+
+5. Reopen the profile with its launcher. Do not run the same session under both accounts at the
+   same time: both append to the same transcript.
+
+To undo this, fully quit Desktop and delete only the files copied into the new account's folder
+(compare it with the backup to distinguish files that were already there), or sign back in to
+the old account. Remote Control links, scheduled tasks, claude.ai chats and cloud sessions do
+not carry over. The terminal `claude-<label>` login is separate from the Desktop login.
+
 ### Optional: show the launcher in /Applications
 
 During `add`, answer `y` to `Also add a shortcut in /Applications?` (default is no).
