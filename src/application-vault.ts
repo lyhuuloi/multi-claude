@@ -1,12 +1,14 @@
-import { approveTree } from './approved-tree.js';
+import { approveTree, assertApprovedTree } from './approved-tree.js';
+import type { ApprovedTree } from './approved-tree.js';
 import { randomUUID } from 'node:crypto';
-import { lstatSync, readdirSync } from 'node:fs';
+import { lstatSync, readdirSync, renameSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
-import { PrivateIO } from './private-io.js';
+import { PrivateIO, sameImage } from './private-io.js';
+import type { FileImage } from './private-io.js';
 import { ChangeRecord } from './change-records.js';
 import { CatalogSession } from './profile-actions.js';
 import { canonicalLocation } from './location-guard.js';
-import { verifyRoot } from './profile-catalog.js';
+import { verifyRoot, uuid } from './profile-catalog.js';
 import type { Profile, RootEvidence } from './profile-catalog.js';
 import { verifyClaude, compareVersions } from './claude-authenticity.js';
 import type { DesktopServices } from './desktop-services.js';
@@ -16,9 +18,12 @@ interface RefreshRecord {
   installationKey: string;
   profileId: string;
   operation: string;
-  phase: 'staging' | 'old-moved' | 'installed' | 'committed';
+  phase: 'staging' | 'displacing' | 'old-moved' | 'installed' | 'committed';
   applications: string[];
+  displaced?: string;
+  evidence?: RootEvidence;
 }
+type CopyClassification = { kind: 'registered' } | { kind: 'displaced' | 'refuse'; error: unknown };
 export class ApplicationVault {
   readonly parent: string;
   readonly application: string;
@@ -50,15 +55,64 @@ export class ApplicationVault {
   async source(): Promise<void> {
     await verifyClaude(this.profile.desktop!.source, true, this.io.guard, this.services.tool);
   }
+  // Classification grants no ownership of the replacement. Only ensure() may preserve it.
+  classifyCopy(): CopyClassification {
+    return this.classifyCopyRoot();
+  }
+  private copyReceipt(evidence: RootEvidence): boolean {
+    try {
+      const receipt = this.io.read(join(this.parent, '.bcm-copy.json'));
+      const value = receipt ? JSON.parse(receipt.bytes.toString('utf8')) as Record<string, unknown> : null;
+      return value?.installationKey === evidence.installationKey && value?.profileId === evidence.profileId
+        && value?.role === evidence.role && value?.nonce === evidence.nonce;
+    } catch {
+      return false;
+    }
+  }
+  private classifyCopyRoot(refresh?: FileImage): CopyClassification {
+    const evidence = this.profile.rootEvidence.find(value => value.role === 'copy');
+    if (!evidence || evidence.location !== this.application) {
+      return { kind: 'refuse', error: new Problem('copy-unowned',
+        'The installed application is unrecognized; it has been preserved.') };
+    }
+    try {
+      verifyRoot(evidence, this.io);
+      return { kind: 'registered' };
+    } catch (error) {
+      if (error instanceof Problem && error.kind === 'root-identity') {
+        try {
+          this.io.guard.chain(this.application);
+          const stat = lstatSync(this.application, { bigint: true });
+          const parent = lstatSync(this.parent, { bigint: true });
+          const journal = this.io.read(this.journal);
+          if (canonicalLocation(this.application) === evidence.location && stat.isDirectory()
+            && !stat.isSymbolicLink() && Number(stat.uid) === evidence.uid && evidence.uid === this.io.guard.uid
+            && (String(stat.dev) !== evidence.device || String(stat.ino) !== evidence.inode)
+            && Number(parent.uid) === this.io.guard.uid && (parent.mode & 0o777n) === 0o700n
+            && this.copyReceipt(evidence)
+            && (refresh ? sameImage(journal?.image ?? null, refresh) : !journal)) {
+            return { kind: 'displaced', error };
+          }
+        } catch {
+          // Retain the original refusal if any independent safety check fails.
+        }
+      }
+      return { kind: 'refuse', error };
+    }
+  }
+  displacedMessage(): string {
+    return 'The dedicated copy was replaced outside multi-claude (for example by Claude\'s own updater '
+    + 'after a direct launch). Launch the profile or run `multi-claude repair ' + this.profile.label
+    + '` to restage it; the replaced bundle is preserved for review.';
+  }
   async existing(): Promise<boolean> {
     if (!this.exists()) {
       return false;
     }
-    const evidence = this.profile.rootEvidence.find(value => value.role === 'copy');
-    if (!evidence || evidence.location !== this.application) {
-      throw new Problem('copy-unowned', 'The installed application is unrecognized; it has been preserved.');
+    const classification = this.classifyCopy();
+    if (classification.kind !== 'registered') {
+      throw classification.error;
     }
-    verifyRoot(evidence, this.io);
     try {
       await verifyClaude(this.application, false, this.io.guard, this.services.tool, true);
       return true;
@@ -83,8 +137,25 @@ export class ApplicationVault {
       if (record.format !== 'bcm-refresh/1' || record.profileId !== this.profile.id
         || record.installationKey !== this.session.catalog.installationKey || record.operation !== expected
         || canonicalLocation(expected) !== expected || !Array.isArray(record.applications)
-        || !['staging', 'old-moved', 'installed', 'committed'].includes(record.phase)) {
+        || !['staging', 'displacing', 'old-moved', 'installed', 'committed'].includes(record.phase)) {
         throw new Error('Invalid refresh record');
+      }
+      if (record.displaced !== undefined) {
+        const prefix = `displaced-${this.profile.id}-`;
+        const name = basename(dirname(record.displaced));
+        if (!name.startsWith(prefix) || !uuid(name.slice(prefix.length))
+          || record.displaced !== join(this.control, 'recovery', name, 'Claude.app')) {
+          throw new Error('Invalid displacement record');
+        }
+      }
+      if (record.evidence !== undefined) {
+        const evidence = record.evidence;
+        if (evidence.location !== this.application || evidence.role !== 'copy'
+          || evidence.installationKey !== record.installationKey || evidence.profileId !== record.profileId
+          || evidence.uid !== this.io.guard.uid || !uuid(evidence.nonce)
+          || !/^\d+$/.test(evidence.device) || !/^\d+$/.test(evidence.inode)) {
+          throw new Error('Invalid installed copy evidence');
+        }
       }
     } catch {
       throw new Problem('refresh-record', 'The interrupted refresh needs manual review.', Exit.recovery);
@@ -106,22 +177,96 @@ export class ApplicationVault {
       }
       await verifyClaude(application, false, this.io.guard, this.services.tool, true);
     }
+    // The catalog commit can precede publication of the committed journal phase.
+    const registered = this.profile.rootEvidence.find(value => value.role === 'copy');
+    const committed = record.phase === 'committed' || (record.evidence !== undefined
+      && JSON.stringify(record.evidence) === JSON.stringify(registered));
+    if (committed && record.evidence) {
+      verifyRoot(record.evidence, this.io);
+    }
+    try {
+      lstatSync(record.operation);
+    } catch (error) {
+      if (!isMissing(error)) {
+        throw error;
+      }
+      const parent = lstatSync(this.parent, { bigint: true });
+      const rolledBack = record.displaced && !this.exists() && registered?.location === this.application
+        && registered.uid === this.io.guard.uid
+        && Number(parent.uid) === this.io.guard.uid && (parent.mode & 0o777n) === 0o700n
+        && this.copyReceipt(registered);
+      if ((committed && record.evidence) || rolledBack) {
+        // Either finish() or rollback() can complete just before the journal is removed.
+        this.session.inventory({ operationId: basename(record.operation), location: record.operation,
+          profileId: this.profile.id }, false);
+        this.io.remove(this.journal, data.image);
+        this.out('An interrupted application refresh was recovered.');
+        return;
+      }
+    }
     const transaction = ChangeRecord.loadApplication(
       this.io, record.operation, this.profile.id, allowed, this.session.inventory,
     );
-    this.io.remove(this.journal, data.image);
+    // Displacement archives are outside the operation. Keep their refresh binding
+    // until recovery completes, including when rollback itself needs another retry.
+    if (!record.displaced) {
+      this.io.remove(this.journal, data.image);
+    }
     let result: number;
     try {
-      result = record.phase === 'committed' ? transaction.finish() : transaction.rollback();
+      result = committed ? transaction.finish() : transaction.rollback();
     } catch {
-      this.io.write(this.journal, JSON.stringify(record) + '\n', null);
+      if (!record.displaced) {
+        this.io.write(this.journal, JSON.stringify(record) + '\n', null);
+      }
       throw new Problem('refresh-pending', 'Interrupted refresh recovery needs manual review.', Exit.recovery);
     }
     if (result !== Exit.ok) {
-      this.io.write(this.journal, JSON.stringify(record) + '\n', null);
+      if (!record.displaced) {
+        this.io.write(this.journal, JSON.stringify(record) + '\n', null);
+      }
       throw new Problem('refresh-pending', 'The interrupted refresh remains protected for review.', Exit.recovery);
     }
+    if (record.displaced) {
+      await this.services.checkpoint?.('copy-recovered');
+      this.io.remove(this.journal, data.image);
+    }
     this.out('An interrupted application refresh was recovered.');
+  }
+  private preserveDisplaced(archive: string, approval: ApprovedTree, refresh: FileImage): void {
+    // Archive directories are deliberately not transaction-owned: neither rollback nor
+    // successful staging cleanup may restore, adopt or delete this review material.
+    const directory = dirname(archive);
+    const destination = this.io.directoryExclusive(directory);
+    const reservation = this.io.directoryExclusive(archive);
+    const parents = this.io.guard.parents(archive);
+    this.io.assertImage(this.journal, refresh);
+    const classification = this.classifyCopyRoot(refresh);
+    if (classification.kind !== 'displaced') {
+      throw new Problem('copy-substituted', 'The displaced application changed; it was left untouched.');
+    }
+    assertApprovedTree(this.application, approval, this.io);
+    this.io.guard.recheck(parents);
+    this.io.guard.recheck(approval.parents);
+    if (this.classifyCopyRoot(refresh).kind !== 'displaced') {
+      throw new Problem('copy-substituted', 'The displaced application changed; it was left untouched.');
+    }
+    const parent = lstatSync(directory, { bigint: true });
+    const leaf = lstatSync(archive, { bigint: true });
+    const source = lstatSync(this.application, { bigint: true });
+    const expected = approval.manifest[0]!;
+    if (String(parent.dev) !== destination.device || String(parent.ino) !== destination.inode
+      || Number(parent.uid) !== destination.uid || (parent.mode & 0o777n) !== 0o700n
+      || !leaf.isDirectory() || String(leaf.dev) !== reservation.device || String(leaf.ino) !== reservation.inode
+      || Number(leaf.uid) !== reservation.uid || readdirSync(archive).length
+      || !source.isDirectory() || String(source.dev) !== expected.device || String(source.ino) !== expected.inode
+      || String(source.uid) !== expected.uid || source.dev !== leaf.dev) {
+      throw new Problem('copy-substituted', 'The preservation destination changed; the application was left untouched.');
+    }
+    renameSync(this.application, archive);
+    this.io.flushDirectory(this.parent);
+    this.io.flushDirectory(directory);
+    this.out(`Replaced application preserved at ${archive}; it can be removed after review.`);
   }
   async stage(transaction: ChangeRecord): Promise<string> {
     let candidate = '';
@@ -202,7 +347,8 @@ export class ApplicationVault {
     await this.source();
     await this.recover();
     const hadCopy = this.exists();
-    const valid = await this.existing();
+    const displaced = hadCopy && this.classifyCopy().kind === 'displaced';
+    const valid = displaced ? false : await this.existing();
     if (valid) {
       const sourceVersion = await this.services.version(this.profile.desktop!.source);
       const installedVersion = await this.services.version(this.application);
@@ -218,7 +364,8 @@ export class ApplicationVault {
       }
     }
     const approved = hadCopy
-      ? approveTree(this.application, this.io, this.profile.rootEvidence.find(root => root.role === 'copy')) : null;
+      ? approveTree(this.application, this.io,
+        displaced ? undefined : this.profile.rootEvidence.find(root => root.role === 'copy')) : null;
     await this.idle();
     const transaction = ChangeRecord.begin(
       this.io, join(this.control, 'recovery'), [], this.session.inventory, this.profile.id,
@@ -255,9 +402,19 @@ export class ApplicationVault {
         if (!approved) {
           throw new Problem('copy-substituted', 'An unapproved application appeared during staging; it was preserved.');
         }
-        transaction.allow(old);
-        transaction.moveTree(this.application, old, true, approved ?? undefined);
-        record.applications.push(old);
+        if (displaced) {
+          record.displaced = join(this.control, 'recovery', `displaced-${this.profile.id}-${randomUUID()}`, 'Claude.app');
+          record.phase = 'displacing';
+          publish();
+          await this.services.checkpoint?.('copy-displacing');
+          await this.idle();
+          this.preserveDisplaced(record.displaced, approved, journalImage!);
+          await this.services.checkpoint?.('copy-displaced');
+        } else {
+          transaction.allow(old);
+          transaction.moveTree(this.application, old, true, approved);
+          record.applications.push(old);
+        }
       }
       record.phase = 'old-moved';
       publish();
@@ -281,6 +438,8 @@ export class ApplicationVault {
         nonce: evidence.nonce, tint: this.profile.desktop!.tint,
       }) + '\n');
       await verifyClaude(this.application, false, this.io.guard, this.services.tool, true);
+      record.evidence = evidence;
+      publish();
       await this.services.checkpoint?.('copy-installed');
       const next = structuredClone(this.session.catalog);
       const updated = next.profiles.find(value => value.id === this.profile.id)!;
@@ -290,16 +449,18 @@ export class ApplicationVault {
       this.session.commit(next);
       this.profile.rootEvidence = structuredClone(updated.rootEvidence);
       committed = true;
+      await this.services.checkpoint?.('copy-committed');
       record.phase = 'committed';
       publish();
       if (transaction.finish() !== Exit.ok) {
         throw new Problem('copy-cleanup', 'Application refresh cleanup remains pending.', Exit.recovery);
       }
+      await this.services.checkpoint?.('copy-cleaned');
       this.io.remove(this.journal, journalImage!);
       return this.application;
     } catch (error) {
       let result = Exit.recovery as number;
-      if (!committed && (valid || !hadCopy || record?.phase === 'staging')) {
+      if (!committed && (valid || !hadCopy || displaced || record?.phase === 'staging')) {
         for (const application of record?.applications ?? []) {
           try {
             lstatSync(application);
@@ -310,7 +471,7 @@ export class ApplicationVault {
             }
           }
         }
-        if (journalImage) {
+        if (journalImage && !record?.displaced) {
           this.io.remove(this.journal, journalImage);
           journalImage = null;
         }

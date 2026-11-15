@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Launching, `repair` and `doctor --apply` can restage a dedicated Claude copy replaced by
+  an external updater when its private parent and receipt still match. The replaced bundle
+  is preserved under private `recovery/displaced-…/Claude.app` storage for manual review;
+  doctor explains the condition without trusting or modifying the replacement.
+
 - Renamed from `ben-claude-multi` to `multi-claude`: package, command, help text and launcher
   identifier. A registry under `~/.config/ben-claude-multi` and `~/.local/share/ben-claude-multi`
   keeps working in place. After installing, run `multi-claude doctor --apply` and

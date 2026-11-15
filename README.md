@@ -199,9 +199,16 @@ update the main Claude as usual, then reopen the profile from its launcher.
 | Symptom | Do this |
 | --- | --- |
 | "The profile engine is missing" | Update the tool, then `multi-claude repair <label>` |
+| "The profile root identity does not match its registration." | Run `multi-claude doctor`. If only the dedicated copy was replaced, quit the profile's Desktop window, then launch the profile from its launcher (or run `multi-claude repair <label>` with its Code sessions closed). The replacement is preserved at the printed recovery path and can be removed after review. Other roots (including Desktop data) still require manual review. |
 | The launcher is not in Applications | It is in `~/Applications/Claude Profiles`; add a shortcut with `repair <label> --shortcut` |
 | A sign-in link opens the wrong Claude window | Enter the email code by hand in the window you want |
 | Anything else | `multi-claude doctor` |
+
+Unpin any dedicated copy from `bundles.noindex` in the Dock and pin its generated
+launcher (`~/Applications/Claude Profiles/Claude <label>.app`) instead. Launching the
+copy directly bypasses profile data and update policy; Claude's updater can then replace
+it. Doctor reports direct copy pins. Making the copy parent read-only is not a fix:
+Squirrel can fall back to a privileged installation and prompt for an admin password.
 
 ## More
 

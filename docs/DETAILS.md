@@ -265,7 +265,10 @@ registration and expected images, and refuses to overwrite concurrent edits or
 resurrect removed profiles. Changed or unrecognized material needs manual review;
 never blindly remove a recovery, staging or profile directory recursively.
 Successful operations and clean rollback discard pre-images: there is no successful
-operation backup or undo history. Keep your own independently reviewed backups.
+operation backup or undo history. Externally replaced dedicated application copies
+are the exception: private `recovery/displaced-…/Claude.app` archives remain for manual
+review and are never restored or automatically cleaned. Keep your own independently
+reviewed backups.
 
 ## Validation
 
