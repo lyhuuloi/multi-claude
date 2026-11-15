@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The interactive `add` target menu now lists Terminal, Desktop, then Paired, and defaults
+  to Terminal. Interactive users who typed target numbers should re-check their selection;
+  `--target` is unaffected.
+
 - Launching, `repair` and `doctor --apply` can restage a dedicated Claude copy replaced by
   an external updater when its private parent and receipt still match. The replaced bundle
   is preserved under private `recovery/displaced-…/Claude.app` storage for manual review;

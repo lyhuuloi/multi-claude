@@ -56,6 +56,31 @@ function answers(f: Fixture, target: string, github: boolean, imported?: boolean
   return result;
 }
 
+test('interactive add displays ASCII target choices and selects the requested surfaces', async () => {
+  const prompt = '1. Terminal - a claude-studio command with its own config and login.\n'
+    + '2. Desktop - a separate Claude Desktop app with its own launcher (experimental).\n'
+    + '3. Paired - both, under one profile; sign in to each separately (experimental).\n'
+    + 'Target number: [1] ';
+  assert.match(prompt, /^[\x20-\x7e\n]+$/);
+  for (const [choice, target] of [['', 'terminal'], ['1', 'terminal'], ['2', 'desktop'], ['3', 'paired']]) {
+    // answers() includes a GitHub response for Code targets, so expose that prompt.
+    const f = fixture(target !== 'desktop');
+    const result = await f.invoke(['add', 'studio'], [choice!, ...answers(f, target!, false)]);
+    assert.equal(result.code, 0, result.text);
+    assert.ok(result.text.startsWith(prompt), result.text);
+    const renderedPrompt = result.text.slice(0, prompt.length);
+    assert.match(renderedPrompt, /^[\x20-\x7e\n]+$/);
+    const profile = f.profile('studio');
+    assert.ok(profile, result.text);
+    assert.equal(!!profile.code, target !== 'desktop');
+    assert.equal(!!profile.desktop, target !== 'terminal');
+  }
+  const f = fixture(false);
+  const invalid = await f.invoke(['add', 'studio'], ['4']);
+  assert.equal(invalid.code, 64);
+  assert.match(invalid.text, /Choose one of the listed targets\./);
+});
+
 for (const target of ['terminal', 'desktop', 'paired']) {
   for (const github of [false, true]) {
     for (const imported of [false, true]) {

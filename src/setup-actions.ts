@@ -36,12 +36,14 @@ export class SetupActions {
         throw new Problem('profile-label', 'Choose a valid lowercase profile label.', Exit.usage);
       }
       if (!target) {
-        this.out('1. Paired\n2. Terminal\n3. Desktop');
+        this.out(`1. Terminal - a claude-${name} command with its own config and login.`);
+        this.out('2. Desktop - a separate Claude Desktop app with its own launcher (experimental).');
+        this.out('3. Paired - both, under one profile; sign in to each separately (experimental).');
         const choice = await this.dialogue.line('Target number: [1]');
         if (choice === null) {
           return Exit.ok;
         }
-        target = ({ '1': 'paired', '2': 'terminal', '3': 'desktop' } as Record<string, string>)[choice.trim() || '1'];
+        target = ({ '1': 'terminal', '2': 'desktop', '3': 'paired' } as Record<string, string>)[choice.trim() || '1'];
       }
       if (!target) {
         throw new Problem('target-choice', 'Choose one of the listed targets.', Exit.usage);
