@@ -25,6 +25,7 @@ import {
 } from './location-guard.js';
 import { ChangeRecord } from './change-records.js';
 import type { RecoveryNotice } from './change-records.js';
+import { volumeUuidForPath } from './machine-services.js';
 import { LeaseManager } from './operation-leases.js';
 import type { LeaseSession } from './operation-leases.js';
 import { Dialogue } from './terminal-dialogue.js';
@@ -305,16 +306,8 @@ export class ProfileActions {
     if (Number(stat.uid) !== this.io.guard.uid) {
       throw new Problem('root-owner', 'The Code root belongs to another owner.');
     }
-    return {
-      location: canonicalLocation(location),
-      role: 'code',
-      uid: Number(stat.uid),
-      device: String(stat.dev),
-      inode: String(stat.ino),
-      installationKey: catalog.installationKey,
-      profileId: profile.id,
-      nonce,
-    };
+    const liveDevice = String(stat.dev), volume = volumeUuidForPath(location, liveDevice);
+    return { location: canonicalLocation(location), role: 'code', uid: Number(stat.uid), device: liveDevice, inode: String(stat.ino), ...(volume ? { volume } : {}), installationKey: catalog.installationKey, profileId: profile.id, nonce };
   }
   async prepareCode(session: CatalogSession, selectedLabel: string, profileId?: string): Promise<CodePlan | null> {
     const existing = session.catalog.profiles.find(profile => profile.label === selectedLabel);

@@ -8,7 +8,8 @@ import type { FileImage } from './private-io.js';
 import { ChangeRecord } from './change-records.js';
 import { CatalogSession } from './profile-actions.js';
 import { canonicalLocation } from './location-guard.js';
-import { verifyRoot, uuid } from './profile-catalog.js';
+import { sameRootIdentity, verifyRoot, uuid, volumeId } from './profile-catalog.js';
+import { volumeUuidForPath } from './machine-services.js';
 import type { Profile, RootEvidence } from './profile-catalog.js';
 import { verifyClaude, compareVersions } from './claude-authenticity.js';
 import type { DesktopServices } from './desktop-services.js';
@@ -153,7 +154,8 @@ export class ApplicationVault {
         if (evidence.location !== this.application || evidence.role !== 'copy'
           || evidence.installationKey !== record.installationKey || evidence.profileId !== record.profileId
           || evidence.uid !== this.io.guard.uid || !uuid(evidence.nonce)
-          || !/^\d+$/.test(evidence.device) || !/^\d+$/.test(evidence.inode)) {
+          || !/^\d+$/.test(evidence.device) || !/^\d+$/.test(evidence.inode)
+          || (evidence.volume !== undefined && !volumeId(evidence.volume))) {
           throw new Error('Invalid installed copy evidence');
         }
       }
@@ -180,7 +182,7 @@ export class ApplicationVault {
     // The catalog commit can precede publication of the committed journal phase.
     const registered = this.profile.rootEvidence.find(value => value.role === 'copy');
     const committed = record.phase === 'committed' || (record.evidence !== undefined
-      && JSON.stringify(record.evidence) === JSON.stringify(registered));
+      && sameRootIdentity(record.evidence, registered));
     if (committed && record.evidence) {
       verifyRoot(record.evidence, this.io);
     }
@@ -425,10 +427,10 @@ export class ApplicationVault {
       record.phase = 'installed';
       record.applications.push(this.application);
       publish();
-      const stat = lstatSync(this.application, { bigint: true });
+      const stat = lstatSync(this.application, { bigint: true }), liveDevice = String(stat.dev), volume = volumeUuidForPath(this.application, liveDevice);
       const evidence: RootEvidence = {
         location: this.application, role: 'copy', uid: Number(stat.uid),
-        device: String(stat.dev), inode: String(stat.ino),
+        device: liveDevice, inode: String(stat.ino), ...(volume ? { volume } : {}),
         installationKey: this.session.catalog.installationKey, profileId: this.profile.id, nonce: randomUUID(),
       };
       const receipt = join(this.parent, '.bcm-copy.json');

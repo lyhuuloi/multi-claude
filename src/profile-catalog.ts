@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { lstatSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { canonicalLocation, protectedPath, refuseOverlap, baselineLocations } from './location-guard.js';
+import { volumeUuidForPath } from './machine-services.js';
 import { PrivateIO } from './private-io.js';
 import type { FileData, FileImage } from './private-io.js';
 import { Problem, Exit } from './outcomes.js';
@@ -13,6 +14,7 @@ export interface RootEvidence {
   uid: number;
   device: string;
   inode: string;
+  volume?: string;
   role: RootRole;
   installationKey: string;
   profileId: string;
@@ -83,6 +85,11 @@ export interface Catalog {
 }
 export const uuid = (x: unknown): x is string => typeof x === 'string' &&
 /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(x);
+export const volumeId = (x: unknown): x is string => typeof x === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(x);
+export const sameRootIdentity = (a: RootEvidence | undefined, b: RootEvidence | undefined): boolean =>
+  !!a && !!b && a.location === b.location && a.uid === b.uid && a.inode === b.inode && a.role === b.role && a.installationKey === b.installationKey && a.profileId === b.profileId && a.nonce === b.nonce && (a.volume === undefined || b.volume === undefined || a.volume === b.volume);
+export const sameProfileIdentity = (a: Profile | null, b: Profile | null): boolean =>
+  !a || !b ? a === b : JSON.stringify({ ...a, rootEvidence: 0 }) === JSON.stringify({ ...b, rootEvidence: 0 }) && a.rootEvidence.length === b.rootEvidence.length && a.rootEvidence.every((r, i) => sameRootIdentity(r, b.rootEvidence[i]));
 const object = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 const text = (x: unknown): x is string => typeof x === 'string';
 const timestamp = (x: unknown): boolean => text(x) && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(x) &&
@@ -176,11 +183,12 @@ export function validateCatalog(value: unknown): Catalog {
     const roles = new Set<string>();
     for (const r of p.rootEvidence) {
       requireValue(object(r));
-      fields(r, 'location uid device inode role installationKey profileId nonce');
+      fields(r, 'location uid device inode volume role installationKey profileId nonce');
       path(r.location);
       requireValue(Number.isSafeInteger(r.uid) && Number(r.uid) >= 0 && text(r.device) && /^\d+$/.test(r.device) &&
-        text(r.inode) && /^\d+$/.test(r.inode) && choices(r.role, ['code', 'desktop', 'policy',
-          'launcher', 'copy']) && r.installationKey === value.installationKey && r.profileId === p.id && uuid(r.nonce));
+        text(r.inode) && /^\d+$/.test(r.inode) && (r.volume === undefined || volumeId(r.volume)) &&
+        choices(r.role, ['code', 'desktop', 'policy', 'launcher', 'copy']) &&
+        r.installationKey === value.installationKey && r.profileId === p.id && uuid(r.nonce));
       requireValue(text(r.role) && !roles.has(r.role));
       roles.add(r.role);
       requireValue(r.role === 'code' ? p.code !== null : p.desktop !== null);
@@ -291,47 +299,24 @@ export function recordRoot(location: string, role: RootRole, installationKey: st
   if (s.uid !== BigInt(io.guard.uid)) {
     throw new Problem('root-owner', 'The profile root belongs to another owner.');
   }
-  const evidence = {
-    location: canonicalLocation(location),
-    role,
-    installationKey,
-    profileId,
-    nonce: randomUUID(),
-    uid: Number(s.uid),
-    device: String(s.dev),
-    inode: String(s.ino)
+  const liveDevice = String(s.dev), volume = volumeUuidForPath(location, liveDevice);
+  const evidence: RootEvidence = {
+    location: canonicalLocation(location), role, installationKey, profileId, nonce: randomUUID(),
+    uid: Number(s.uid), device: liveDevice, inode: String(s.ino), ...(volume ? { volume } : {}),
   };
   io.write(join(role === 'copy' ? dirname(location) : location, role === 'copy' ? '.bcm-copy.json' :
     '.bcm-root.json'), JSON.stringify({ installationKey, profileId, role, nonce: evidence.nonce }), null);
   return evidence;
 }
-export function verifyRoot(r: RootEvidence, io: PrivateIO): RootEvidence {
+export function verifyRoot(r: RootEvidence, io: PrivateIO, volumeLookup = volumeUuidForPath): RootEvidence {
   io.guard.chain(r.location);
-  const s = lstatSync(r.location, { bigint: true });
-  if (canonicalLocation(r.location) !== r.location || Number(s.uid) !== r.uid ||
-    String(s.ino) !== r.inode) {
-    throw new Problem('root-identity',
-      'The profile root identity does not match its registration.');
-  }
-  const receiptPath = join(r.role === 'copy' ? dirname(r.location) : r.location,
-    r.role === 'copy' ? '.bcm-copy.json' : '.bcm-root.json');
-  let data: FileData | null;
-  let receipt: unknown;
-  try {
-    data = io.read(receiptPath);
-    receipt = JSON.parse(data?.bytes.toString('utf8') ?? 'null');
-  } catch {
-    throw new Problem('root-receipt', 'The profile receipt is unreadable.');
-  }
-  if (!data || !object(receipt) || receipt.installationKey !== r.installationKey || receipt.profileId !== r.profileId ||
-    receipt.role !== r.role || receipt.nonce !== r.nonce) {
-    throw new Problem('root-receipt',
-      'The profile receipt does not match its registration.');
-  }
-  const liveDevice = String(s.dev);
-  if (data.image.device !== liveDevice) {
-    throw new Problem('root-identity',
-      'The profile root identity does not match its registration.');
-  }
-  return liveDevice === r.device ? r : { ...r, device: liveDevice };
+  const s = lstatSync(r.location, { bigint: true }), liveDevice = String(s.dev);
+  if (canonicalLocation(r.location) !== r.location || Number(s.uid) !== r.uid || String(s.ino) !== r.inode) throw new Problem('root-identity', 'The profile root identity does not match its registration.');
+  let data: FileData | null, receipt: unknown;
+  try { data = io.read(join(r.role === 'copy' ? dirname(r.location) : r.location, r.role === 'copy' ? '.bcm-copy.json' : '.bcm-root.json')); receipt = JSON.parse(data?.bytes.toString('utf8') ?? 'null'); }
+  catch { throw new Problem('root-receipt', 'The profile receipt is unreadable.'); }
+  if (!data || !object(receipt) || receipt.installationKey !== r.installationKey || receipt.profileId !== r.profileId || receipt.role !== r.role || receipt.nonce !== r.nonce) throw new Problem('root-receipt', 'The profile receipt does not match its registration.');
+  const liveVolume = liveDevice !== r.device || r.volume === undefined ? volumeLookup(r.location, liveDevice) : r.volume;
+  if (data.image.device !== liveDevice || (liveDevice !== r.device && (!r.volume || !liveVolume || liveVolume !== r.volume))) throw new Problem('root-identity', 'The profile root identity does not match its registration.');
+  return liveDevice === r.device && (r.volume !== undefined || !liveVolume) ? r : { ...r, device: liveDevice, ...(liveVolume ? { volume: liveVolume } : {}) };
 }

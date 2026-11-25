@@ -8,7 +8,7 @@ import { lstatSync } from 'node:fs';
 import { ChangeRecord } from './change-records.js';
 import type { OperationRecord } from './change-records.js';
 import { LifecycleActions } from './lifecycle-actions.js';
-import { validateCatalog, validateLocations, uuid, verifyRoot } from './profile-catalog.js';
+import { sameProfileIdentity, validateCatalog, validateLocations, uuid, verifyRoot } from './profile-catalog.js';
 import type { Profile, RootEvidence } from './profile-catalog.js';
 import { present, checkedRoot } from './managed-resources.js';
 import { baselineLocations, overlaps } from './location-guard.js';
@@ -87,7 +87,7 @@ export class RecoveryActions {
       }
       const binding = record.registration!;
       const current = session.catalog.profiles.find(profile => profile.id === record.profileId) ?? null;
-      const equal = (left: Profile | null, right: Profile | null) => JSON.stringify(left) === JSON.stringify(right);
+      const equal = (left: Profile | null, right: Profile | null) => sameProfileIdentity(left, right);
       const before = equal(current, binding.before);
       const after = equal(current, binding.after);
       if (!before && !after) {

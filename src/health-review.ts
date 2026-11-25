@@ -667,23 +667,8 @@ export class HealthReview {
         status ||= fences;
         for (const profile of next.profiles.filter(value => safe.has(value.id))) {
           let refreshed = false;
-          for (const root of profile.rootEvidence) {
-            try {
-              if (!present(root.location)) {
-                continue;
-              }
-              const live = verifyRoot(root, work.io);
-              if (live.device !== root.device) {
-                root.device = live.device;
-                refreshed = true;
-              }
-            } catch {
-              // Post-repair inventory reports any remaining identity or receipt failure.
-            }
-          }
-          if (refreshed) {
-            work.out(`${profile.label}: refreshed recorded device id after volume renumbering.`);
-          }
+          for (const root of profile.rootEvidence) { try { if (!present(root.location)) continue; const live = verifyRoot(root, work.io); if (live.device !== root.device || (root.volume === undefined && live.volume !== undefined)) { root.device = live.device; if (live.volume) root.volume = live.volume; refreshed = true; } } catch {} }
+          if (refreshed) work.out(`${profile.label}: refreshed recorded device/volume identity.`);
         }
         session.commit(next);
         committed = true;

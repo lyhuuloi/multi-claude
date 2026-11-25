@@ -21,11 +21,9 @@ Private directories and files use explicit `0700` and `0600` modes. Checked read
 and atomic replacements reject links, nonregular files, unsafe ownership and link
 counts. Open descriptors are checked as well as paths. Parent trust includes
 writable grants and ACLs; directly shared writable parents remain unacceptable even
-when sticky. Root identity combines canonical location, owner, inode, same-volume
-agreement with its private receipt, and the receipt's installation, profile, role
-and nonce binding (recorded device numbers tolerate macOS APFS reboot renumbering,
-while in-operation guards still pin the live device and inode). Alias and
-path-character checks precede mutations.
+when sticky. Root identity combines canonical location, owner, inode, volume UUID, same-volume
+receipt agreement, and receipt nonce binding (device renumbering tolerates reboot only when
+volume UUID matches; in-operation guards pin live device+inode). Alias and path-character checks precede mutations.
 
 One registry lease spans mutation prompts and commits. UUID leases serialize CLI
 and Dock copy maintenance, tint, repair and lifecycle work, acquired in sorted

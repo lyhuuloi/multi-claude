@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { lstatSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { canonicalLocation } from './location-guard.js';
+import { volumeUuidForPath } from './machine-services.js';
 import { PrivateIO, treeManifest } from './private-io.js';
 import type { Catalog, Profile, RootEvidence, RootRole } from './profile-catalog.js';
 import { verifyRoot } from './profile-catalog.js';
@@ -22,10 +23,10 @@ export function evidence(
   path: string, role: RootRole, profile: Profile, catalog: Catalog, io: PrivateIO,
 ): RootEvidence {
   io.guard.chain(path);
-  const stat = lstatSync(path, { bigint: true });
+  const stat = lstatSync(path, { bigint: true }), liveDevice = String(stat.dev), volume = volumeUuidForPath(path, liveDevice);
   return {
-    location: canonicalLocation(path), role, uid: Number(stat.uid), device: String(stat.dev), inode: String(stat.ino),
-    installationKey: catalog.installationKey, profileId: profile.id, nonce: randomUUID(),
+    location: canonicalLocation(path), role, uid: Number(stat.uid), device: liveDevice, inode: String(stat.ino),
+    ...(volume ? { volume } : {}), installationKey: catalog.installationKey, profileId: profile.id, nonce: randomUUID(),
   };
 }
 export function rootReceipt(root: RootEvidence, tint?: string): string {
