@@ -1,4 +1,4 @@
-import { treeManifest } from './private-io.js';
+import { sameTreeManifest, treeManifest } from './private-io.js';
 import { shellEntryFinding } from './shell-entries.js';
 import { launcherFinding } from './launcher-review.js';
 import { productionHealthServices } from './health-services.js';
@@ -128,7 +128,7 @@ export class RecoveryActions {
         }
         const relocated = { ...root, location: moved.to };
         verifyRoot(relocated, work.io);
-        if (JSON.stringify(treeManifest(moved.to, work.io)) !== JSON.stringify(moved.expected)) {
+        if (!sameTreeManifest(treeManifest(moved.to, work.io), moved.expected)) {
           throw new Problem('recovery-root', 'The moved Code tree differs from its recorded image.', Exit.recovery);
         }
         return relocated;

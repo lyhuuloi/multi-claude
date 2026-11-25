@@ -95,8 +95,8 @@ export function volumeUuidForPath(path: string, device: string): string | null {
   if (!match) return null; const id = match[1]!.toLowerCase(); volumeCache.set(device, id); return id;
 }
 export function sameVolumeDevice(path: string, liveDevice: string, recordedDevice: string, recordedVolume?: string, lookup = volumeUuidForPath): boolean {
-  if (liveDevice === recordedDevice) return true;
-  return Boolean(recordedVolume && lookup(path, liveDevice) === recordedVolume);
+  if (recordedVolume) { const live = lookup(path, liveDevice); return Boolean(live && live === recordedVolume); }
+  return liveDevice === recordedDevice;
 }
 export function parentAclAllowsReplacement(path: string): boolean {
   if (process.platform !== 'darwin') {
