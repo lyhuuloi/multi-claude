@@ -40,7 +40,7 @@ export function checkedRoot(profile: Profile, role: RootRole, io: PrivateIO, mis
     throw new Problem('root-evidence', `The ${role} root has no recorded identity.`);
   }
   if (!missing || present(root.location)) {
-    verifyRoot(root, io);
+    return verifyRoot(root, io);
   }
   return root;
 }
@@ -60,8 +60,8 @@ export function destination(path: string, from: string | null, io: PrivateIO): v
 export function updateLauncher(
   built: string, installed: string, root: RootEvidence, transaction: ChangeRecord, io: PrivateIO,
 ): void {
-  verifyRoot(root, io);
-  transaction.pinRoot(root.location, root.device, root.inode);
+  const live = verifyRoot(root, io);
+  transaction.pinRoot(live.location, live.device, live.inode);
   const entries = treeManifest(built, io);
   if (entries.some(entry => entry.kind === 'link')) {
     throw new Problem('launcher-link', 'Generated launcher staging contains a link.');

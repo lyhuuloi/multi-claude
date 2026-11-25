@@ -126,8 +126,7 @@ export class RecoveryActions {
         if (moved.uncertain || !baselineSafe(moved.to) || !(inOperation(moved.to) || inResource(moved.to))) {
           throw new Problem('recovery-root', 'The moved Code root has uncertain or invalid scope.', Exit.recovery);
         }
-        const relocated = { ...root, location: moved.to };
-        verifyRoot(relocated, work.io);
+        const relocated = verifyRoot({ ...root, location: moved.to }, work.io);
         if (JSON.stringify(treeManifest(moved.to, work.io)) !== JSON.stringify(moved.expected)) {
           throw new Problem('recovery-root', 'The moved Code tree differs from its recorded image.', Exit.recovery);
         }

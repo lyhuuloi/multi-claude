@@ -3,7 +3,7 @@ import { lstatSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { canonicalLocation, protectedPath, refuseOverlap, baselineLocations } from './location-guard.js';
 import { PrivateIO } from './private-io.js';
-import type { FileImage } from './private-io.js';
+import type { FileData, FileImage } from './private-io.js';
 import { Problem, Exit } from './outcomes.js';
 // The catalog format id keeps the tool's first name so existing registries stay readable.
 export const formatTag = 'ben-claude-multi/catalog@1';
@@ -305,24 +305,33 @@ export function recordRoot(location: string, role: RootRole, installationKey: st
     '.bcm-root.json'), JSON.stringify({ installationKey, profileId, role, nonce: evidence.nonce }), null);
   return evidence;
 }
-export function verifyRoot(r: RootEvidence, io: PrivateIO): void {
+export function verifyRoot(r: RootEvidence, io: PrivateIO): RootEvidence {
   io.guard.chain(r.location);
   const s = lstatSync(r.location, { bigint: true });
-  if (canonicalLocation(r.location) !== r.location || Number(s.uid) !== r.uid || String(s.dev) !== r.device ||
+  if (canonicalLocation(r.location) !== r.location || Number(s.uid) !== r.uid ||
     String(s.ino) !== r.inode) {
     throw new Problem('root-identity',
       'The profile root identity does not match its registration.');
   }
+  const receiptPath = join(r.role === 'copy' ? dirname(r.location) : r.location,
+    r.role === 'copy' ? '.bcm-copy.json' : '.bcm-root.json');
+  let data: FileData | null;
   let receipt: unknown;
   try {
-    receipt = JSON.parse(io.read(join(r.role === 'copy' ? dirname(r.location) : r.location,
-      r.role === 'copy' ? '.bcm-copy.json' : '.bcm-root.json'))?.bytes.toString('utf8') ?? 'null');
+    data = io.read(receiptPath);
+    receipt = JSON.parse(data?.bytes.toString('utf8') ?? 'null');
   } catch {
     throw new Problem('root-receipt', 'The profile receipt is unreadable.');
   }
-  if (!object(receipt) || receipt.installationKey !== r.installationKey || receipt.profileId !== r.profileId ||
+  if (!data || !object(receipt) || receipt.installationKey !== r.installationKey || receipt.profileId !== r.profileId ||
     receipt.role !== r.role || receipt.nonce !== r.nonce) {
     throw new Problem('root-receipt',
       'The profile receipt does not match its registration.');
   }
+  const liveDevice = String(s.dev);
+  if (data.image.device !== liveDevice) {
+    throw new Problem('root-identity',
+      'The profile root identity does not match its registration.');
+  }
+  return liveDevice === r.device ? r : { ...r, device: liveDevice };
 }

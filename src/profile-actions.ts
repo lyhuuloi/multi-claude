@@ -154,13 +154,13 @@ export class ProfileActions {
     if (!profile.code || !evidence || evidence.location !== profile.code.location) {
       throw new Problem('root-evidence', 'The Code root has no matching ownership evidence.');
     }
-    verifyRoot(evidence, this.io);
+    const live = verifyRoot(evidence, this.io);
     if (profile.code.github) {
       if (assertGithubDirectory(profile.code.github, this.io, allowMissingGithub)) {
         this.io.read(join(profile.code.github, 'hosts.yml'));
       }
     }
-    return evidence;
+    return live;
   }
   private async census(profiles: readonly Profile[]): Promise<Census> {
     try {
@@ -213,8 +213,8 @@ export class ProfileActions {
   async fences(catalog: Catalog, transaction: ChangeRecord, safe?: ReadonlySet<string>): Promise<number> {
     const census = await this.census(catalog.profiles);
     const findings = synchronizeFences(catalog, this.where.control, this.io, (path, bytes, expected, root) => {
-      verifyRoot(root, this.io);
-      transaction.pinRoot(root.location, root.device, root.inode);
+      const live = verifyRoot(root, this.io);
+      transaction.pinRoot(live.location, live.device, live.inode);
       transaction.allow(path);
       transaction.write(path, bytes, undefined, expected);
     }, profile => {

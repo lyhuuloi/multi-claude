@@ -665,6 +665,26 @@ export class HealthReview {
         const next = work.actions.workingCatalog(session, transaction);
         const fences = await work.actions.fences(next, transaction, safe);
         status ||= fences;
+        for (const profile of next.profiles.filter(value => safe.has(value.id))) {
+          let refreshed = false;
+          for (const root of profile.rootEvidence) {
+            try {
+              if (!present(root.location)) {
+                continue;
+              }
+              const live = verifyRoot(root, work.io);
+              if (live.device !== root.device) {
+                root.device = live.device;
+                refreshed = true;
+              }
+            } catch {
+              // Post-repair inventory reports any remaining identity or receipt failure.
+            }
+          }
+          if (refreshed) {
+            work.out(`${profile.label}: refreshed recorded device id after volume renumbering.`);
+          }
+        }
         session.commit(next);
         committed = true;
         const cleanup = transaction.finish();

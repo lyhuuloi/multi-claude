@@ -87,7 +87,7 @@ export class ApplicationVault {
           const journal = this.io.read(this.journal);
           if (canonicalLocation(this.application) === evidence.location && stat.isDirectory()
             && !stat.isSymbolicLink() && Number(stat.uid) === evidence.uid && evidence.uid === this.io.guard.uid
-            && (String(stat.dev) !== evidence.device || String(stat.ino) !== evidence.inode)
+            && stat.dev === parent.dev && String(stat.ino) !== evidence.inode
             && Number(parent.uid) === this.io.guard.uid && (parent.mode & 0o777n) === 0o700n
             && this.copyReceipt(evidence)
             && (refresh ? sameImage(journal?.image ?? null, refresh) : !journal)) {
@@ -310,7 +310,7 @@ export class ApplicationVault {
       this.io, join(this.control, 'recovery'), [], this.session.inventory, this.profile.id,
     );
     transaction.bind(this.profile, this.profile);
-    const root = this.profile.rootEvidence.find(value => value.role === 'copy')!;
+    const root = verifyRoot(this.profile.rootEvidence.find(value => value.role === 'copy')!, this.io);
     transaction.pinRoot(root.location, root.device, root.inode);
     const icon = join(this.application, 'Icon\r');
     transaction.allow(icon);
