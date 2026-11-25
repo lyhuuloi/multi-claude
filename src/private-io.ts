@@ -18,10 +18,12 @@ import {
 import { dirname, join, basename } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { LocationGuard, protectedPath } from './location-guard.js';
+import { sameVolumeDevice, volumeUuidForPath } from './machine-services.js';
 import { isMissing, Problem } from './outcomes.js';
 import type { BigIntStats } from 'node:fs';
 export interface FileImage {
   device: string;
+  volume?: string;
   inode: string;
   uid: number;
   mode: number;
@@ -35,23 +37,21 @@ export interface FileData {
   image: FileImage
 }
 export const digest = (bytes: Buffer | string): string => createHash('sha256').update(bytes).digest('hex');
-export const sameImage = (a: FileImage | null, b: FileImage | null): boolean => JSON.stringify(a) === JSON.stringify(b);
+export const sameDeviceField = (a: { device: string; volume?: string }, b: { device: string; volume?: string }): boolean =>
+  a.device === b.device ? (a.volume === undefined || b.volume === undefined || a.volume === b.volume) : Boolean(a.volume && a.volume === b.volume);
+export const sameImage = (a: FileImage | null, b: FileImage | null): boolean =>
+  !a || !b ? a === b : sameDeviceField(a, b) && a.inode === b.inode && a.uid === b.uid && a.mode === b.mode && a.size === b.size && a.modified === b.modified && a.changed === b.changed && a.digest === b.digest;
 function regular(s: BigIntStats, uid: number): void {
   if (!s.isFile() || s.uid !== BigInt(uid) || s.nlink !== 1n || (s.mode & 0o022n) !== 0n) {
     throw new Problem('unsafe-file',
       'The file must be regular, owner-controlled and single-linked.');
   }
 }
-function image(s: BigIntStats, bytes: Buffer): FileImage {
+function image(s: BigIntStats, bytes: Buffer, path: string): FileImage {
+  const device = String(s.dev), volume = volumeUuidForPath(path, device);
   return {
-    device: String(s.dev),
-    inode: String(s.ino),
-    uid: Number(s.uid),
-    mode: Number(s.mode & 0o777n),
-    size: String(s.size),
-    modified: String(s.mtimeNs),
-    changed: String(s.ctimeNs),
-    digest: digest(bytes)
+    device, ...(volume ? { volume } : {}), inode: String(s.ino), uid: Number(s.uid),
+    mode: Number(s.mode & 0o777n), size: String(s.size), modified: String(s.mtimeNs), changed: String(s.ctimeNs), digest: digest(bytes),
   };
 }
 export interface IOHooks {
@@ -125,7 +125,7 @@ export class PrivateIO {
         throw new Problem('file-changed',
           'The file changed while reading.');
       }
-      return { bytes, image: image(after, bytes) };
+      return { bytes, image: image(after, bytes, path) };
     } finally {
       closeSync(fd);
     }
@@ -328,6 +328,7 @@ export interface TreeEntry {
   name: string;
   kind: 'directory' | 'file' | 'link';
   device: string;
+  volume?: string;
   inode: string;
   uid: string;
   mode: string;
@@ -336,6 +337,10 @@ export interface TreeEntry {
   changed: string;
   digest: string
 }
+export const sameTreeEntry = (a: TreeEntry, b: TreeEntry): boolean =>
+  sameDeviceField(a, b) && a.name === b.name && a.kind === b.kind && a.inode === b.inode && a.uid === b.uid && a.mode === b.mode && a.size === b.size && a.modified === b.modified && a.changed === b.changed && a.digest === b.digest;
+export const sameTreeManifest = (a: readonly TreeEntry[], b: readonly TreeEntry[]): boolean =>
+  a.length === b.length && a.every((entry, i) => sameTreeEntry(entry, b[i]!));
 export function treeManifest(root: string, io: PrivateIO): TreeEntry[] {
   io.guard.chain(root);
   const result: TreeEntry[] = [];
@@ -348,17 +353,11 @@ export function treeManifest(root: string, io: PrivateIO): TreeEntry[] {
     if (!kind) {
       throw new Problem('tree-kind', 'The tree contains an unsupported entry.');
     }
+    const device = String(s.dev), volume = volumeUuidForPath(path, device);
     result.push({
-      name,
-      kind,
-      device: String(s.dev),
-      inode: String(s.ino),
-      uid: String(s.uid),
-      mode: String(s.mode),
-      size: String(s.size),
-      modified: String(s.mtimeNs),
-      changed: String(s.ctimeNs),
-      digest: kind === 'file' ? io.contentDigest(path, root) : kind === 'link' ? digest(readlinkSync(path)) : ''
+      name, kind, device, ...(volume ? { volume } : {}), inode: String(s.ino), uid: String(s.uid), mode: String(s.mode),
+      size: String(s.size), modified: String(s.mtimeNs), changed: String(s.ctimeNs),
+      digest: kind === 'file' ? io.contentDigest(path, root) : kind === 'link' ? digest(readlinkSync(path)) : '',
     });
     if (kind === 'directory') {
       for (const child of readdirSync(path).sort()) {
@@ -384,15 +383,13 @@ export function cleanSealedTree(root: string, manifest: TreeEntry[], io: Private
     for (const entry of actual) {
       const prior = manifest.find(value => value.name === entry.name);
       const directory = entry.kind === 'directory' && prior?.kind === 'directory';
-      if (!prior || (directory ? ['device', 'inode', 'uid', 'mode'].some(key =>
-        entry[key as keyof TreeEntry] !== prior[key as keyof TreeEntry])
-        : JSON.stringify(entry) !== JSON.stringify(prior))) {
+      if (!prior || (directory ? (!sameDeviceField(entry, prior) || entry.inode !== prior.inode || entry.uid !== prior.uid || entry.mode !== prior.mode) : !sameTreeEntry(entry, prior))) {
         throw new Problem('tree-conflict', 'Partial cleanup preserves changed or unrecognized material.');
       }
     }
     manifest = actual;
   }
-  if (!partial && JSON.stringify(actual) !== JSON.stringify(manifest)) {
+  if (!partial && !sameTreeManifest(actual, manifest)) {
     throw new Problem('tree-conflict',
       'The staging tree changed; retain it for review.');
   }
@@ -406,16 +403,14 @@ export function cleanSealedTree(root: string, manifest: TreeEntry[], io: Private
     io.guard.recheck(parents);
     const rootNow = lstatSync(root, { bigint: true }),
     rootEntry = manifest.find(e => e.name === '');
-    if (!rootEntry || !rootNow.isDirectory() || String(rootNow.dev) !== rootEntry.device || String(rootNow.ino)
-      !== rootEntry.inode) {
+    if (!rootEntry || !rootNow.isDirectory() || !sameVolumeDevice(root, String(rootNow.dev), rootEntry.device, rootEntry.volume) || String(rootNow.ino) !== rootEntry.inode) {
       throw new Problem('tree-conflict',
         'The staging root was substituted.');
     }
     const path = entry.name ? join(root, entry.name) : root;
     io.guard.chain(dirname(path), entry.name ? root : undefined);
     const s = lstatSync(path, { bigint: true });
-    if (String(s.dev) !== entry.device || String(s.ino) !== entry.inode || String(s.uid) !== entry.uid ||
-      String(s.mode) !== entry.mode) {
+    if (!sameVolumeDevice(path, String(s.dev), entry.device, entry.volume) || String(s.ino) !== entry.inode || String(s.uid) !== entry.uid || String(s.mode) !== entry.mode) {
       throw new Problem('tree-conflict',
         'A staging entry was substituted.');
     }

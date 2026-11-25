@@ -3,9 +3,10 @@ import type { ApprovedTree } from './approved-tree.js';
 import { randomUUID } from 'node:crypto';
 import { join, dirname, basename } from 'node:path';
 import { lstatSync, rmdirSync, readdirSync, renameSync, readlinkSync, unlinkSync } from 'node:fs';
-import { PrivateIO, sameImage, digest, treeManifest, cleanSealedTree } from './private-io.js';
+import { PrivateIO, sameDeviceField, sameImage, sameTreeEntry, sameTreeManifest, digest, treeManifest, cleanSealedTree } from './private-io.js';
 import type { Profile } from './profile-catalog.js';
 import type { FileImage, TreeEntry } from './private-io.js';
+import { sameVolumeDevice, volumeUuidForPath } from './machine-services.js';
 import { canonicalLocation } from './location-guard.js';
 import { Problem, Exit, isMissing } from './outcomes.js';
 // Finder stores custom icons in this fixed metadata filename; it is never a selectable root.
@@ -37,7 +38,7 @@ interface TreeMove {
 export interface OperationRecord {
   format: 'bcm-operation/1';
   registration?: { before: Profile | null; after: Profile | null };
-  guards?: { path: string; device: string; inode: string }[];
+  guards?: { path: string; device: string; volume?: string; inode: string }[];
   id: string;
   profileId: string | null;
   phase: 'open' | 'conflicted' | 'complete';
@@ -48,6 +49,7 @@ export interface OperationRecord {
   directories: {
     path: string;
     device: string;
+    volume?: string;
     inode: string
   }[];
   links: {
@@ -168,10 +170,11 @@ export class ChangeRecord {
       !activeRoots.some(root => root.startsWith(directory.path + '/')));
     this.persist();
   }
-  pinRoot(path: string, device: string, inode: string): void {
+  pinRoot(path: string, device: string, inode: string, volume?: string): void {
     this.record.guards ??= [];
     if (!this.record.guards.some(value => value.path === path)) {
-      this.record.guards.push({ path, device, inode });
+      const vol = volume ?? volumeUuidForPath(path, device) ?? undefined;
+      this.record.guards.push({ path, device, ...(vol ? { volume: vol } : {}), inode });
       this.persist();
     }
   }
@@ -180,7 +183,7 @@ export class ChangeRecord {
       if (path === guard.path || path.startsWith(guard.path + '/')) {
         this.io.guard.chain(guard.path);
         const stat = lstatSync(guard.path, { bigint: true });
-        if (String(stat.dev) !== guard.device || String(stat.ino) !== guard.inode) {
+        if (!sameVolumeDevice(guard.path, String(stat.dev), guard.device, guard.volume) || String(stat.ino) !== guard.inode) {
           throw new Problem('guard-substituted', 'The operation root identity changed.', Exit.recovery);
         }
       }
@@ -301,8 +304,8 @@ export class ChangeRecord {
         const next = after.get(name);
         const ancestor = name === '' || target.startsWith(name + '/');
         const validAncestor = ancestor && old?.kind === 'directory' && next?.kind === 'directory'
-        && old.device === next.device && old.inode === next.inode && old.uid === next.uid && old.mode === next.mode;
-        if (!validAncestor && JSON.stringify(old) !== JSON.stringify(next)) {
+        && sameDeviceField(old, next) && old.inode === next.inode && old.uid === next.uid && old.mode === next.mode;
+        if (!validAncestor && (!old || !next || !sameTreeEntry(old, next))) {
           throw new Problem('move-conflict', 'A concurrent tree change cannot become operation-owned.');
         }
       }
@@ -352,8 +355,8 @@ export class ChangeRecord {
     this.createDirectory(dirname(path));
     this.persist();
     this.io.directory(path);
-    const stat = lstatSync(path, { bigint: true });
-    this.record.directories.push({ path, device: String(stat.dev), inode: String(stat.ino) });
+    const stat = lstatSync(path, { bigint: true }), device = String(stat.dev), volume = volumeUuidForPath(path, device);
+    this.record.directories.push({ path, device, ...(volume ? { volume } : {}), inode: String(stat.ino) });
     this.refreshMoved(path);
     this.persist();
   }
@@ -362,8 +365,8 @@ export class ChangeRecord {
     this.createDirectory(dirname(path));
     this.allow(path);
     this.persist();
-    const created = this.io.directoryExclusive(path);
-    this.record.directories.push({ path, device: created.device, inode: created.inode });
+    const created = this.io.directoryExclusive(path), volume = volumeUuidForPath(path, created.device);
+    this.record.directories.push({ path, device: created.device, ...(volume ? { volume } : {}), inode: created.inode });
     this.refreshMoved(path);
     this.persist();
     return created;
@@ -545,7 +548,7 @@ export class ChangeRecord {
     for (const move of this.record.moves) {
       try {
         if (move.uncertain || (move.installed
-          && JSON.stringify(treeManifest(move.to, this.io)) !== JSON.stringify(move.expected))) {
+          && !sameTreeManifest(treeManifest(move.to, this.io), move.expected))) {
           changed.add(move);
         }
       } catch {
@@ -593,7 +596,7 @@ export class ChangeRecord {
         }
         this.io.guard.parents(move.from);
         this.io.guard.parents(move.to);
-        if (JSON.stringify(treeManifest(move.to, this.io)) !== JSON.stringify(move.expected)) {
+        if (!sameTreeManifest(treeManifest(move.to, this.io), move.expected)) {
           throw new Problem('move-conflict', 'Rollback preserves the changed moved tree.');
         }
         try {
@@ -606,12 +609,12 @@ export class ChangeRecord {
         }
         const enclosing = this.record.trees.filter(tree => move.from.startsWith(tree.path + '/'));
         for (const tree of enclosing) {
-          if (JSON.stringify(treeManifest(tree.path, this.io)) !== JSON.stringify(tree.manifest)) {
+          if (!sameTreeManifest(treeManifest(tree.path, this.io), tree.manifest)) {
             throw new Problem('stage-conflict', 'Rollback staging was changed.');
           }
         }
         const reservation = this.io.directoryExclusive(move.from);
-        if (JSON.stringify(treeManifest(move.to, this.io)) !== JSON.stringify(move.expected)) {
+        if (!sameTreeManifest(treeManifest(move.to, this.io), move.expected)) {
           throw new Problem('move-conflict', 'The restoration source changed after reserving its destination.');
         }
         const leaf = lstatSync(move.from, { bigint: true });
@@ -641,7 +644,7 @@ export class ChangeRecord {
         try {
           this.io.guard.chain(directory.path);
           const stat = lstatSync(directory.path, { bigint: true });
-          if (String(stat.dev) !== directory.device || String(stat.ino) !== directory.inode) {
+          if (!sameVolumeDevice(directory.path, String(stat.dev), directory.device, directory.volume) || String(stat.ino) !== directory.inode) {
             throw new Problem('directory-conflict', 'An operation-created directory was substituted.');
           }
           rmdirSync(directory.path);
@@ -684,7 +687,7 @@ export class ChangeRecord {
       }
       for (const move of this.record.moves) {
         if (move.installed && !(partial && move.discard)
-          && JSON.stringify(treeManifest(move.to, this.io)) !== JSON.stringify(move.expected)) {
+          && !sameTreeManifest(treeManifest(move.to, this.io), move.expected)) {
           throw new Problem('move-conflict', 'The installed tree changed before operation completion.');
         }
       }
