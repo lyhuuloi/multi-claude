@@ -85,6 +85,19 @@ export function executableCandidates(name: 'node' | 'claude' | 'gh', path: strin
   }
   return result;
 }
+const volumeCache = new Map<string, string>();
+export function volumeUuidForPath(path: string, device: string): string | null {
+  const cached = volumeCache.get(device); if (cached !== undefined) return cached;
+  const opt = { encoding: 'utf8' as const, timeout: 3000, maxBuffer: 65536, env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LC_ALL: 'C' } };
+  const df = spawnSync('/bin/df', ['-P', path], opt), fsDev = df.status === 0 ? df.stdout.trim().split('\n').at(-1)?.split(/\s+/)[0] : undefined;
+  const info = fsDev && /^\/dev\/disk\d+(?:s\d+)*$/.test(fsDev) ? spawnSync('/usr/sbin/diskutil', ['info', '-plist', fsDev], opt) : null;
+  const match = info?.status === 0 ? /<key>VolumeUUID<\/key>\s*<string>([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})<\/string>/.exec(info.stdout) : null;
+  if (!match) return null; const id = match[1]!.toLowerCase(); volumeCache.set(device, id); return id;
+}
+export function sameVolumeDevice(path: string, liveDevice: string, recordedDevice: string, recordedVolume?: string, lookup = volumeUuidForPath): boolean {
+  if (liveDevice === recordedDevice) return true;
+  return Boolean(recordedVolume && lookup(path, liveDevice) === recordedVolume);
+}
 export function parentAclAllowsReplacement(path: string): boolean {
   if (process.platform !== 'darwin') {
     throw new Problem('acl-unavailable', 'macOS ACL inspection is unavailable.',
